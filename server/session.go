@@ -1,0 +1,36 @@
+package server
+
+import (
+	"net/http"
+	"time"
+
+	"github.com/alexedwards/scs/v2"
+)
+
+// Session keys.
+const (
+	SessionKeyUserID       = "user_id"
+	SessionKeyFlashSuccess = "flash-success"
+)
+
+// NewSessionManager creates a new session manager.
+func NewSessionManager(store scs.Store, secure bool) *scs.SessionManager {
+	sm := scs.New()
+	sm.Store = store
+	sm.HashTokenInStore = true
+	sm.Lifetime = 12 * 30 * 24 * time.Hour // 12 months
+	sm.IdleTimeout = 30 * 24 * time.Hour   // 30 days
+	sm.Cookie.Name = "session_id"
+	sm.Cookie.Domain = ""
+	sm.Cookie.HttpOnly = true
+	sm.Cookie.Path = "/"
+	sm.Cookie.Persist = true
+	sm.Cookie.SameSite = http.SameSiteLaxMode
+	sm.Cookie.Secure = secure
+
+	sm.ErrorFunc = func(_ http.ResponseWriter, _ *http.Request, err error) {
+		panic(err)
+	}
+
+	return sm
+}

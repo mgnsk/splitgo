@@ -1,0 +1,6 @@
+/splitgo
+/data/
+tmp/
+vendor/
+.env
+build-errors.log
