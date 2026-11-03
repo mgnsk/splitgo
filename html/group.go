@@ -43,17 +43,22 @@ func groupHeader(d GroupData, tab string) Node {
 			A(Class("btn btn-primary"), Href(base+"/expenses/new"), Text("Add expense")),
 		),
 		Nav(Class("tabs"),
-			tabLink(base, "Expenses", "expenses"),
-			tabLink(base+"/balances", "Balances", "balances"),
+			tabLink(base, "Overview", "overview"),
 			tabLink(base+"/settings", "Settings", "settings"),
 		),
 	)
 }
 
-// GroupExpensesMain renders the group expenses page.
-func GroupExpensesMain(d GroupData, expenses []*domain.Expense, more bool) Node {
+// GroupMain renders the group page: balances followed by the expense list.
+func GroupMain(d GroupData, debts []domain.Debt, spending map[string]int64, expenses []*domain.Expense, more bool) Node {
 	return Div(Class("stack"),
-		groupHeader(d, "expenses"),
+		groupHeader(d, "overview"),
+
+		H2(Class("section-title"), Text("Balances")),
+		balanceList(d, debts),
+		If(d.Group.SimplifyDebts && len(debts) > 0, P(Class("hint"), Text("Debts are simplified to minimize the number of payments."))),
+
+		H2(Class("section-title"), Text("Expenses")),
 		Div(Class("card card-flush"),
 			Ul(Class("list"), ID("expense-list"),
 				If(len(expenses) == 0, Li(Div(Class("list-empty"),
@@ -64,7 +69,19 @@ func GroupExpensesMain(d GroupData, expenses []*domain.Expense, more bool) Node 
 				ExpenseListPartial(d, expenses, more),
 			),
 		),
+		If(len(spending) > 0, P(Class("hint"), Text("Total spending: "), spendingSummary(spending))),
 	)
+}
+
+func spendingSummary(spending map[string]int64) Node {
+	var parts Group
+	for i, code := range sortedCurrencies(spending) {
+		if i > 0 {
+			parts = append(parts, Text(" · "))
+		}
+		parts = append(parts, Text(Fmt(spending[code], code)))
+	}
+	return parts
 }
 
 // ExpenseListPartial renders expense list items with a lazy "load more" item.
@@ -147,57 +164,35 @@ func lower(name string) string {
 	return name
 }
 
-// GroupBalancesMain renders the group balances page.
-func GroupBalancesMain(d GroupData, debts []domain.Debt, spending map[string]int64) Node {
+func balanceList(d GroupData, debts []domain.Debt) Node {
 	base := groupURL(d.Group.ID)
 
-	return Div(Class("stack"),
-		groupHeader(d, "balances"),
-
-		Div(Class("row-between"),
-			H2(Class("section-title"), Text("Who owes whom")),
-			A(Class("btn btn-sm"), Href(base+"/settle"), Text("Record a payment")),
-		),
-		Div(Class("card card-flush"),
-			Ul(Class("list"),
-				If(len(debts) == 0, emptyItem("Everyone is settled up.")),
-				Map(debts, func(debt domain.Debt) Node {
-					q := url.Values{
-						"from":     {debt.From.String()},
-						"to":       {debt.To.String()},
-						"currency": {debt.Currency},
-						"amount":   {money.FormatPlain(debt.Amount, money.MustCurrency(debt.Currency))},
-					}
-					involved := debt.From == d.Me.ID || debt.To == d.Me.ID
-					return Li(Div(Class("list-item"),
-						Avatar(d.People.name(debt.From)),
-						Div(Class("grow"),
-							Div(Class("title"),
-								Text(d.People.Name(debt.From, d.Me.ID)), Text(owesVerb(debt.From, d.Me.ID)),
-								Text(lower(d.People.Name(debt.To, d.Me.ID))),
-							),
-							Div(Class("small"), If(involved, Amount(signFor(debt, d.Me.ID), debt.Currency)),
-								If(!involved, Span(Class("muted"), Text(Fmt(debt.Amount, debt.Currency))))),
+	return Div(Class("card card-flush"),
+		Ul(Class("list"),
+			If(len(debts) == 0, emptyItem("Everyone is settled up.")),
+			Map(debts, func(debt domain.Debt) Node {
+				q := url.Values{
+					"from":     {debt.From.String()},
+					"to":       {debt.To.String()},
+					"currency": {debt.Currency},
+					"amount":   {money.FormatPlain(debt.Amount, money.MustCurrency(debt.Currency))},
+				}
+				involved := debt.From == d.Me.ID || debt.To == d.Me.ID
+				return Li(Div(Class("list-item"),
+					Avatar(d.People.name(debt.From)),
+					Div(Class("grow"),
+						Div(Class("title"),
+							Text(d.People.Name(debt.From, d.Me.ID)), Text(owesVerb(debt.From, d.Me.ID)),
+							Text(lower(d.People.Name(debt.To, d.Me.ID))),
 						),
-						A(Classes{"btn": true, "btn-sm": true, "btn-primary": involved},
-							Href(base+"/settle?"+q.Encode()), Text("Settle up")),
-					))
-				}),
-			),
+						Div(Class("small"), If(involved, Amount(signFor(debt, d.Me.ID), debt.Currency)),
+							If(!involved, Span(Class("muted"), Text(Fmt(debt.Amount, debt.Currency))))),
+					),
+					A(Classes{"btn": true, "btn-sm": true, "btn-primary": involved},
+						Href(base+"/settle?"+q.Encode()), Text("Settle up")),
+				))
+			}),
 		),
-		If(d.Group.SimplifyDebts, P(Class("hint"), Text("Debts are simplified to minimize the number of payments."))),
-
-		If(len(spending) > 0, Group{
-			H2(Class("section-title"), Text("Total spending")),
-			Div(Class("card stack-sm"),
-				Map(sortedCurrencies(spending), func(code string) Node {
-					return Div(Class("row-between"),
-						Span(Class("muted"), Text(code)),
-						Strong(Text(Fmt(spending[code], code))),
-					)
-				}),
-			),
-		}),
 	)
 }
 

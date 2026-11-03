@@ -36,8 +36,7 @@ func NewGroupHandler(deps *Deps) *GroupHandler {
 func (h *GroupHandler) Register(mux *http.ServeMux) {
 	h.handle(mux, "GET /groups/new", h.NewGroup, true)
 	h.handle(mux, "POST /groups", h.CreateGroup, true)
-	h.handle(mux, "GET /groups/{group_id}", h.Expenses, true)
-	h.handle(mux, "GET /groups/{group_id}/balances", h.Balances, true)
+	h.handle(mux, "GET /groups/{group_id}", h.Show, true)
 	h.handle(mux, "GET /groups/{group_id}/settings", h.Settings, true)
 	h.handle(mux, "POST /groups/{group_id}/settings", h.UpdateSettings, true)
 	h.handle(mux, "POST /groups/{group_id}/members", h.AddMember, true)
@@ -79,9 +78,9 @@ func (h *GroupHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, groupPath(group.ID), http.StatusSeeOther)
 }
 
-// Expenses renders the group's expenses. For htmx requests with a cursor it
-// renders the next page of list items.
-func (h *GroupHandler) Expenses(w http.ResponseWriter, r *http.Request) {
+// Show renders the group balances and expenses. For htmx requests with a
+// cursor it renders the next page of expense list items.
+func (h *GroupHandler) Show(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
 	req := decode[contract.GroupPage](r)
@@ -109,16 +108,6 @@ func (h *GroupHandler) Expenses(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	server.RenderPage(w, r, h.SM, d.Group.Name, html.GroupExpensesMain(d, expenses, more))
-}
-
-// Balances renders who owes whom in the group.
-func (h *GroupHandler) Balances(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	me := mustUser(r)
-	req := decode[contract.GroupPath](r)
-	d := h.loadGroup(ctx, me, req.GroupID)
-
 	debts, err := model.GroupDebts(ctx, h.DB, d.Group)
 	if err != nil {
 		panic(err)
@@ -135,7 +124,7 @@ func (h *GroupHandler) Balances(w http.ResponseWriter, r *http.Request) {
 	}
 	h.addPeople(ctx, d.People, ids)
 
-	server.RenderPage(w, r, h.SM, d.Group.Name, html.GroupBalancesMain(d, debts, spending))
+	server.RenderPage(w, r, h.SM, d.Group.Name, html.GroupMain(d, debts, spending, expenses, more))
 }
 
 // Settings renders the group settings.

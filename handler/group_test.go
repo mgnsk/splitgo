@@ -93,7 +93,7 @@ var _ = Describe("groups", func() {
 		mallory := env.newClient()
 		mallory.login("mallory@example.com")
 
-		for _, path := range []string{group, group + "/balances", group + "/settings", group + "/expenses/new", group + "/settle"} {
+		for _, path := range []string{group, group + "/settings", group + "/expenses/new", group + "/settle"} {
 			Expect(mallory.get(path).StatusCode).To(Equal(http.StatusNotFound), path)
 		}
 

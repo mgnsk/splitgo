@@ -46,7 +46,7 @@ var _ = Describe("expenses", func() {
 
 	balances := func(c *client) string {
 		GinkgoHelper()
-		resp := c.get(group + "/balances")
+		resp := c.get(group)
 		Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		return text(resp.body)
 	}
@@ -243,10 +243,19 @@ var _ = Describe("expenses", func() {
 		settle("7")
 		b := balances(alice)
 		Expect(b).To(ContainSubstring("Everyone is settled up"))
-		Expect(b).To(ContainSubstring("Total spending EUR €24.00"))
+		Expect(b).To(ContainSubstring("Total spending: €24.00"))
 
 		Expect(text(alice.get("/").body)).To(ContainSubstring("You're all settled up."))
 		Expect(text(alice.get(group).body)).To(ContainSubstring("bob paid you €7.00"))
+	})
+
+	It("shows balances above the expense list on the group page", func() {
+		alice.addExpense(group, url.Values{"description": {"Pizza"}, "amount": {"20"}, "preset": {"you-paid-equal"}})
+
+		t := text(alice.get(group).body)
+		Expect(t).To(MatchRegexp(`Balances .*bob owes you €10\.00 Settle up Expenses .*Pizza`))
+		Expect(t).NotTo(ContainSubstring("Record a payment"))
+		Expect(alice.get(group + "/balances").StatusCode).To(Equal(http.StatusNotFound))
 	})
 
 	It("validates payments", func() {
