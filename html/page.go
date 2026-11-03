@@ -32,8 +32,9 @@ func Page(props PageProps) Node {
 	}
 
 	return HTML5(HTML5Props{
-		Title:    title,
-		Language: "en",
+		Title:     title,
+		Language:  "en",
+		HTMLAttrs: Group{themeAttr(props.User)},
 		Head: []Node{
 			Meta(Name("viewport"), Content("width=device-width, initial-scale=1")),
 			Meta(
@@ -63,13 +64,14 @@ func topbar(user *domain.User, path string) Node {
 	return Header(Class("topbar"),
 		Div(Class("topbar-inner"),
 			A(Class("brand"), Href("/"), Text("splitgo")),
-			If(user != nil,
+			If(user != nil, Group{
 				Nav(Class("nav"),
 					navLink("/", "Home", path == "/"),
 					navLink("/activity", "Activity", path == "/activity"),
 					navLink("/account", "Account", path == "/account"),
 				),
-			),
+				themeToggle(path),
+			}),
 		),
 	)
 }

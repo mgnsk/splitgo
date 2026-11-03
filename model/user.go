@@ -17,6 +17,7 @@ type User struct {
 	Email    string       `bun:"email"`
 	Name     string       `bun:"name"`
 	Currency string       `bun:"currency"`
+	Theme    string       `bun:"theme"`
 
 	bun.BaseModel `bun:"users"`
 }
@@ -29,7 +30,7 @@ func InsertUser(ctx context.Context, db bun.IDB, user *domain.User) error {
 // UpdateUser updates a user's profile.
 func UpdateUser(ctx context.Context, db bun.IDB, user *domain.User) error {
 	return sqlite.WithErrorChecking(db.NewUpdate().Model(userFromDomain(user)).
-		Column("name", "currency").
+		Column("name", "currency", "theme").
 		WherePK().
 		Exec(ctx))
 }
@@ -82,6 +83,7 @@ func userFromDomain(u *domain.User) *User {
 		Email:    domain.NormalizeEmail(u.Email),
 		Name:     u.Name,
 		Currency: u.Currency,
+		Theme:    themeOrDefault(u.Theme),
 	}
 }
 
@@ -91,5 +93,13 @@ func userToDomain(m *User) *domain.User {
 		Email:    m.Email,
 		Name:     m.Name,
 		Currency: m.Currency,
+		Theme:    domain.Theme(themeOrDefault(domain.Theme(m.Theme))),
 	}
+}
+
+func themeOrDefault(t domain.Theme) string {
+	if !t.Valid() {
+		return string(domain.ThemeSystem)
+	}
+	return string(t)
 }

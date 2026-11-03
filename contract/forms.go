@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/mgnsk/splitgo/domain"
 	"github.com/mgnsk/splitgo/money"
 	"github.com/mgnsk/splitgo/pkg/snowflake"
 )
@@ -30,6 +31,7 @@ func (f *LoginForm) Validate() url.Values {
 type AccountForm struct {
 	Name     string `in:"form=name"`
 	Currency string `in:"form=currency"`
+	Theme    string `in:"form=theme"`
 }
 
 // Validate the form.
@@ -40,6 +42,24 @@ func (f *AccountForm) Validate() url.Values {
 		errs.Set("name", "Name is too long")
 	}
 	validateCurrency(errs, "currency", f.Currency)
+	if !domain.Theme(f.Theme).Valid() {
+		errs.Set("theme", "Unknown theme")
+	}
+	return errs
+}
+
+// ThemeForm sets the color theme from the top menu toggle.
+type ThemeForm struct {
+	Theme string `in:"form=theme"`
+	Next  string `in:"form=next"`
+}
+
+// Validate the form.
+func (f *ThemeForm) Validate() url.Values {
+	errs := url.Values{}
+	if !domain.Theme(f.Theme).Valid() {
+		errs.Set("theme", "Unknown theme")
+	}
 	return errs
 }
 

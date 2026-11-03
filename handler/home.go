@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 
+	"github.com/mgnsk/splitgo"
 	"github.com/mgnsk/splitgo/contract"
 	"github.com/mgnsk/splitgo/domain"
 	"github.com/mgnsk/splitgo/html"
@@ -29,6 +30,7 @@ func (h *HomeHandler) Register(mux *http.ServeMux) {
 	h.handle(mux, "GET /activity", h.Activity, true)
 	h.handle(mux, "GET /account", h.Account, true)
 	h.handle(mux, "POST /account", h.Account, true)
+	h.handle(mux, "POST /theme", h.SetTheme, true)
 }
 
 // Home renders the overview of balances and groups.
@@ -114,7 +116,7 @@ func (h *HomeHandler) Account(w http.ResponseWriter, r *http.Request) {
 	me := mustUser(r)
 
 	if r.Method == http.MethodGet {
-		form := contract.AccountForm{Name: me.Name, Currency: me.Currency}
+		form := contract.AccountForm{Name: me.Name, Currency: me.Currency, Theme: string(me.Theme)}
 		server.RenderPage(w, r, h.SM, "Account", html.AccountMain(me, form, nil))
 		return
 	}
@@ -128,6 +130,7 @@ func (h *HomeHandler) Account(w http.ResponseWriter, r *http.Request) {
 	updated := *me
 	updated.Name = req.Name
 	updated.Currency = req.Currency
+	updated.Theme = domain.Theme(req.Theme)
 
 	if err := model.UpdateUser(r.Context(), h.DB, &updated); err != nil {
 		panic(err)
@@ -135,4 +138,24 @@ func (h *HomeHandler) Account(w http.ResponseWriter, r *http.Request) {
 
 	server.Flash(r, h.SM, "Account saved")
 	http.Redirect(w, r, "/account", http.StatusSeeOther)
+}
+
+// SetTheme saves the color theme chosen with the top menu toggle and returns
+// to the current page.
+func (h *HomeHandler) SetTheme(w http.ResponseWriter, r *http.Request) {
+	me := mustUser(r)
+	req := decode[contract.ThemeForm](r)
+
+	if errs := req.Validate(); len(errs) > 0 {
+		panic(splitgo.InvalidValue.New(errs.Get("theme")))
+	}
+
+	updated := *me
+	updated.Theme = domain.Theme(req.Theme)
+
+	if err := model.UpdateUser(r.Context(), h.DB, &updated); err != nil {
+		panic(err)
+	}
+
+	http.Redirect(w, r, safeNext(req.Next), http.StatusSeeOther)
 }

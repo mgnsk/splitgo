@@ -13,6 +13,22 @@ type User struct {
 	Email    string
 	Name     string
 	Currency string
+	Theme    Theme
+}
+
+// Theme is a color theme preference.
+type Theme string
+
+// Themes.
+const (
+	ThemeSystem Theme = "system"
+	ThemeLight  Theme = "light"
+	ThemeDark   Theme = "dark"
+)
+
+// Valid reports whether t is a known theme.
+func (t Theme) Valid() bool {
+	return t == ThemeSystem || t == ThemeLight || t == ThemeDark
 }
 
 // DisplayName returns the name or, if empty, the local part of the email.

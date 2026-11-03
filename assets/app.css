@@ -14,11 +14,28 @@
   --danger: #b91c1c;
   --radius: 12px;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 8px rgb(0 0 0 / 0.04);
-  color-scheme: light dark;
+  color-scheme: light;
+}
+
+/* Dark theme: explicit choice, or the OS setting unless light was chosen. */
+:root[data-theme="dark"] {
+  --bg: #0f1115;
+  --surface: #171a20;
+  --text: #e8eaee;
+  --muted: #9097a3;
+  --border: #262a33;
+  --accent: #2dd4bf;
+  --accent-text: #062723;
+  --accent-soft: #10302c;
+  --pos: #34d399;
+  --neg: #fb923c;
+  --danger: #f87171;
+  --shadow: none;
+  color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0f1115;
     --surface: #171a20;
     --text: #e8eaee;
@@ -31,6 +48,7 @@
     --neg: #fb923c;
     --danger: #f87171;
     --shadow: none;
+    color-scheme: dark;
   }
 }
 
@@ -320,3 +338,26 @@ input.invalid, select.invalid { border-color: var(--danger); }
 .preview { background: var(--bg); border-radius: 10px; padding: 0.75rem 1rem; }
 .big-amount { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; }
 .list-item.flush { padding-left: 0; padding-right: 0; }
+
+/* Theme toggle: show the button switching away from the effective theme. */
+
+.theme-toggle { display: flex; margin-left: 0.25rem; }
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.icon-btn:hover { color: var(--text); background: var(--bg); }
+.icon-btn.to-light { display: none; }
+:root[data-theme="dark"] .icon-btn.to-dark { display: none; }
+:root[data-theme="dark"] .icon-btn.to-light { display: inline-grid; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .icon-btn.to-dark { display: none; }
+  :root:not([data-theme="light"]) .icon-btn.to-light { display: inline-grid; }
+}

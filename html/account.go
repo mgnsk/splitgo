@@ -28,10 +28,25 @@ func AccountMain(me *domain.User, form contract.AccountForm, errs url.Values) No
 				Errors:      errs,
 			}),
 			CurrencySelect("Default currency for new groups", "currency", form.Currency, errs),
+			components.SelectField(components.SelectProps{
+				Label:   "Appearance",
+				Name:    "theme",
+				Value:   form.Theme,
+				Options: themeSelectOptions(),
+				Errors:  errs,
+			}),
 			Div(components.SubmitButton("Save", false)),
 		),
 		Form(Method("post"), Action("/logout"),
 			Button(Type("submit"), Class("btn"), Text("Sign out")),
 		),
 	)
+}
+
+func themeSelectOptions() []components.SelectOption {
+	opts := make([]components.SelectOption, len(ThemeOptions))
+	for i, t := range ThemeOptions {
+		opts[i] = components.SelectOption{Value: string(t.Value), Label: t.Label}
+	}
+	return opts
 }
