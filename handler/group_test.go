@@ -150,4 +150,58 @@ var _ = Describe("groups", func() {
 		alice.addExpense(group, url.Values{"amount": {"10"}, "preset": {"you-paid-equal"}})
 		Expect(alice.post(group+"/delete", nil, true).StatusCode).To(Equal(http.StatusPreconditionFailed))
 	})
+
+	It("allows leaving and deleting once simplified debts are settled", func(ctx SpecContext) {
+		addBob()
+		carol := mustCreateUser(ctx, "carol@example.com")
+		Expect(alice.post(group+"/members", url.Values{"email": {"carol@example.com"}}, false).StatusCode).To(Equal(http.StatusSeeOther))
+		resp := alice.post(group+"/settings", url.Values{"name": {"Trip"}, "currency": {"EUR"}, "simplify_debts": {"true"}}, false)
+		Expect(resp.StatusCode).To(Equal(http.StatusSeeOther))
+
+		// Bob owes Alice 10 and Carol owes Bob 10: simplified, Carol pays Alice.
+		alice.addExpense(group, url.Values{"amount": {"10"}, "mode": {"advanced"}, "split_type": {"equal"},
+			"paid_by": {aliceU.ID.String()}, "included": {bobU.ID.String()}})
+		alice.addExpense(group, url.Values{"amount": {"10"}, "mode": {"advanced"}, "split_type": {"equal"},
+			"paid_by": {bobU.ID.String()}, "included": {carol.ID.String()}})
+		Expect(text(alice.get(group).body)).To(ContainSubstring("carol owes you €10.00"))
+
+		resp = alice.post(group+"/settle", url.Values{
+			"from": {carol.ID.String()}, "to": {aliceU.ID.String()},
+			"amount": {"10"}, "currency": {"EUR"}, "date": {"2026-11-03"},
+		}, false)
+		Expect(resp.StatusCode).To(Equal(http.StatusSeeOther))
+		Expect(text(alice.get(group).body)).To(ContainSubstring("Everyone is settled up."))
+
+		body := alice.get(group + "/settings").body
+		Expect(body).NotTo(MatchRegexp(`disabled[^>]*>(Leave|Delete) group`))
+		Expect(text(body)).NotTo(ContainSubstring("must be settled up"))
+
+		resp = bob.post(group+"/leave", nil, true)
+		Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
+
+		resp = alice.post(group+"/delete", nil, true)
+		Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
+		Expect(alice.get(group).StatusCode).To(Equal(http.StatusNotFound))
+	})
+
+	It("explains why leaving or deleting is not possible", func() {
+		// Alice is the only member.
+		body := alice.get(group + "/settings").body
+		Expect(body).To(MatchRegexp(`<button type="button" class="btn btn-danger" disabled[^>]*>Leave group`))
+		Expect(body).To(MatchRegexp(`<button type="button" class="btn btn-danger" hx-post="[^"]+/delete"[^>]*>Delete group`))
+		Expect(text(body)).To(ContainSubstring("You're the only member, so you can't leave. Delete the group instead."))
+
+		addBob()
+		alice.addExpense(group, url.Values{"amount": {"10"}, "preset": {"you-paid-equal"}})
+
+		body = alice.get(group + "/settings").body
+		Expect(body).To(MatchRegexp(`<button type="button" class="btn btn-danger" disabled[^>]*>Delete group`))
+		Expect(text(body)).To(ContainSubstring("Settle up your balances in this group before leaving it."))
+		Expect(text(body)).To(ContainSubstring("Everyone must be settled up before the group can be deleted."))
+
+		// Bob is not the creator: no delete button or hint.
+		t := text(bob.get(group + "/settings").body)
+		Expect(t).NotTo(ContainSubstring("Delete group"))
+		Expect(t).NotTo(ContainSubstring("Everyone must be settled up"))
+	})
 })

@@ -219,8 +219,33 @@ type GroupSettingsData struct {
 	AddEmail  string
 	AddErrors url.Values
 	InviteURL string
-	CanLeave  bool
-	CanDelete bool
+	// Settled is set when the user has no balances in the group.
+	Settled bool
+	// AllSettled is set when nobody in the group has balances.
+	AllSettled bool
+}
+
+func (d GroupSettingsData) canLeave() bool {
+	return d.Settled && len(d.Members) > 1
+}
+
+func (d GroupSettingsData) isCreator() bool {
+	return d.Group.CreatedBy == d.Me.ID
+}
+
+// leaveDeleteHints explains why leaving or deleting is not possible yet.
+func (d GroupSettingsData) leaveDeleteHints() []string {
+	var hints []string
+	switch {
+	case len(d.Members) == 1:
+		hints = append(hints, "You're the only member, so you can't leave. Delete the group instead.")
+	case !d.Settled:
+		hints = append(hints, "Settle up your balances in this group before leaving it.")
+	}
+	if d.isCreator() && !d.AllSettled {
+		hints = append(hints, "Everyone must be settled up before the group can be deleted.")
+	}
+	return hints
 }
 
 // GroupSettingsMain renders the group settings page.
@@ -287,14 +312,16 @@ func GroupSettingsMain(d GroupSettingsData) Node {
 
 		Div(Class("card stack-sm"),
 			Div(Class("row wrap"),
-				Button(Type("button"), Class("btn btn-danger"), If(!d.CanLeave, Disabled()),
+				Button(Type("button"), Class("btn btn-danger"), If(!d.canLeave(), Disabled()),
 					hx.Post(base+"/leave"), hx.Confirm("Leave this group?"), Text("Leave group")),
-				If(d.Group.CreatedBy == d.Me.ID,
-					Button(Type("button"), Class("btn btn-danger"), If(!d.CanDelete, Disabled()),
+				If(d.isCreator(),
+					Button(Type("button"), Class("btn btn-danger"), If(!d.AllSettled, Disabled()),
 						hx.Post(base+"/delete"), hx.Confirm("Delete this group and all its expenses?"), Text("Delete group")),
 				),
 			),
-			P(Class("hint"), Text("You can leave or delete a group once all balances involving you are settled.")),
+			Map(d.leaveDeleteHints(), func(hint string) Node {
+				return P(Class("hint"), Text(hint))
+			}),
 		),
 	)
 }

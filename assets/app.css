@@ -257,6 +257,8 @@ input.invalid, select.invalid { border-color: var(--danger); }
   white-space: nowrap;
 }
 .btn:hover { text-decoration: none; background: var(--bg); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn:disabled:hover { background: var(--surface); }
 .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 .btn-primary:hover { background: var(--accent); filter: brightness(1.08); }
 .btn-danger { color: var(--danger); }

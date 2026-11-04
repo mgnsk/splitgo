@@ -160,25 +160,30 @@ func (h *GroupHandler) renderSettings(
 	settled, allSettled := h.settledState(r.Context(), d)
 
 	server.RenderPage(w, r, h.SM, d.Group.Name, html.GroupSettingsMain(html.GroupSettingsData{
-		GroupData: d,
-		Form:      form,
-		Errors:    errs,
-		AddEmail:  addEmail,
-		AddErrors: addErrs,
-		InviteURL: fmt.Sprintf("%s/join/%s", h.Config.BaseURL, d.Group.InviteCode),
-		CanLeave:  settled && len(d.Members) > 1,
-		CanDelete: allSettled,
+		GroupData:  d,
+		Form:       form,
+		Errors:     errs,
+		AddEmail:   addEmail,
+		AddErrors:  addErrs,
+		InviteURL:  fmt.Sprintf("%s/join/%s", h.Config.BaseURL, d.Group.InviteCode),
+		Settled:    settled,
+		AllSettled: allSettled,
 	}))
 }
 
-// settledState reports whether the user and the whole group are settled.
-// Pairwise debts are used regardless of simplification so that nobody is
-// left with an unrecoverable debt.
+// settledState reports whether the user and the whole group are settled,
+// matching the balances shown on the group page.
+//
+// The user is settled when they have no debts as the group computes them:
+// simplified if the group simplifies debts, otherwise pairwise. Settling
+// simplified debts leaves pairwise debts that cancel out, so checking
+// pairwise debts there would never let anyone leave.
+//
+// The whole group is settled when everyone's net balance is zero, which is
+// when simplified debts are empty. Deleting the group then loses nobody
+// any money, whichever way the debts are shown.
 func (h *GroupHandler) settledState(ctx context.Context, d html.GroupData) (me, all bool) {
-	pairwise := *d.Group
-	pairwise.SimplifyDebts = false
-
-	debts, err := model.GroupDebts(ctx, h.DB, &pairwise)
+	debts, err := model.GroupDebts(ctx, h.DB, d.Group)
 	if err != nil {
 		panic(err)
 	}
@@ -187,7 +192,15 @@ func (h *GroupHandler) settledState(ctx context.Context, d html.GroupData) (me, 
 		return debt.From == d.Me.ID || debt.To == d.Me.ID
 	})
 
-	return me, len(debts) == 0
+	simplified := *d.Group
+	simplified.SimplifyDebts = true
+
+	net, err := model.GroupDebts(ctx, h.DB, &simplified)
+	if err != nil {
+		panic(err)
+	}
+
+	return me, len(net) == 0
 }
 
 // UpdateSettings updates the group settings.
