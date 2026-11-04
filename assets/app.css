@@ -205,7 +205,7 @@ a.list-item:hover { background: var(--bg); text-decoration: none; }
 
 form { margin: 0; }
 
-.field { display: flex; flex-direction: column; gap: 0.3rem; }
+.field { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
 .field > label, .label { font-size: 0.875rem; font-weight: 550; }
 .hint { font-size: 0.8rem; color: var(--muted); }
 .error-text { font-size: 0.85rem; color: var(--danger); }
@@ -228,6 +228,10 @@ input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible
 }
 
 input.invalid, select.invalid { border-color: var(--danger); }
+
+/* iOS Safari gives date inputs an intrinsic min-width and centered value. */
+input[type="date"] { -webkit-appearance: none; appearance: none; min-width: 0; display: block; }
+input[type="date"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
 
 .input-amount { font-size: 1.5rem; font-weight: 650; }
 
@@ -291,7 +295,7 @@ input.invalid, select.invalid { border-color: var(--danger); }
 
 /* Split options (radio cards) */
 
-.options { display: grid; gap: 0.5rem; }
+.options { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.5rem; }
 .option {
   display: flex;
   align-items: center;
@@ -304,7 +308,7 @@ input.invalid, select.invalid { border-color: var(--danger); }
 }
 .option:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
 .option input { accent-color: var(--accent); width: 1.1rem; height: 1.1rem; margin: 0; }
-.option .title { font-weight: 550; }
+.option .title { font-weight: 550; overflow-wrap: anywhere; }
 
 .split-table { width: 100%; border-collapse: collapse; }
 .split-table td { padding: 0.4rem 0; vertical-align: middle; }
