@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -114,7 +115,9 @@ func (p *WebPush) Notify(ctx context.Context, userIDs []snowflake.ID, msg Messag
 	}
 
 	for _, s := range subs {
-		p.wg.Go(func() { p.send(s, payload) })
+		// SendNotification appends padding to the message, writing into its
+		// spare capacity, so each send needs its own copy.
+		p.wg.Go(func() { p.send(s, slices.Clone(payload)) })
 	}
 }
 
