@@ -20,6 +20,9 @@ type FieldProps struct {
 	Errors      url.Values
 	Required    bool
 	Attrs       []Node
+	// AfterInput is rendered right after the input, positioned against it,
+	// e.g. a suggestion list.
+	AfterInput Node
 }
 
 // Field renders a labeled input with an optional error message.
@@ -32,18 +35,23 @@ func Field(p FieldProps) Node {
 		typ = "text"
 	}
 
+	var input Node = Input(
+		ID(id),
+		Name(p.Name),
+		Type(typ),
+		Value(p.Value),
+		If(p.Placeholder != "", Placeholder(p.Placeholder)),
+		If(p.Required, Required()),
+		If(errMsg != "", Group{Class("invalid"), Aria("invalid", "true")}),
+		Group(p.Attrs),
+	)
+	if p.AfterInput != nil {
+		input = Div(Class("combo"), input, p.AfterInput)
+	}
+
 	return Div(Class("field"),
 		If(p.Label != "", Label(For(id), Text(p.Label))),
-		Input(
-			ID(id),
-			Name(p.Name),
-			Type(typ),
-			Value(p.Value),
-			If(p.Placeholder != "", Placeholder(p.Placeholder)),
-			If(p.Required, Required()),
-			If(errMsg != "", Group{Class("invalid"), Aria("invalid", "true")}),
-			Group(p.Attrs),
-		),
+		input,
 		If(p.Hint != "" && errMsg == "", P(Class("hint"), Text(p.Hint))),
 		ErrorText(errMsg),
 	)

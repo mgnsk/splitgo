@@ -374,3 +374,130 @@ document.addEventListener("DOMContentLoaded", () => {
   fillTimezoneInputs();
   syncTimezone();
 });
+
+// Suggestion dropdowns: an input with data-combo="<list id>" shows the
+// list's options matching what has been typed. A native <datalist> isn't
+// used because Firefox doesn't open it on click.
+function comboParts(input) {
+  const list = document.getElementById(input.dataset.combo);
+  return list ? { list, items: [...list.querySelectorAll("li[data-value]")] } : null;
+}
+
+function comboClose(input) {
+  const parts = comboParts(input);
+  if (!parts) {
+    return;
+  }
+  parts.list.hidden = true;
+  input.setAttribute("aria-expanded", "false");
+  for (const li of parts.items) {
+    li.removeAttribute("aria-selected");
+  }
+}
+
+function comboOpen(input) {
+  const parts = comboParts(input);
+  if (!parts) {
+    return;
+  }
+  const query = input.value.trim().toLowerCase();
+  let shown = 0;
+  for (const li of parts.items) {
+    const match = query === "" || li.textContent.toLowerCase().includes(query);
+    // An exact match has nothing left to suggest.
+    li.hidden = !match || li.dataset.value.toLowerCase() === query;
+    li.removeAttribute("aria-selected");
+    if (!li.hidden) {
+      shown++;
+    }
+  }
+  parts.list.hidden = shown === 0;
+  input.setAttribute("aria-expanded", String(shown > 0));
+}
+
+function comboPick(input, li) {
+  input.value = li.dataset.value;
+  comboClose(input);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function comboInput(target) {
+  return target instanceof HTMLInputElement && target.dataset.combo ? target : null;
+}
+
+document.addEventListener("focusin", (event) => {
+  const input = comboInput(event.target);
+  if (input) {
+    comboOpen(input);
+  }
+});
+
+document.addEventListener("focusout", (event) => {
+  const input = comboInput(event.target);
+  if (input) {
+    comboClose(input);
+  }
+});
+
+document.addEventListener("click", (event) => {
+  const input = comboInput(event.target);
+  if (input) {
+    comboOpen(input); // Reopen after Escape or a pick.
+  }
+});
+
+document.addEventListener("input", (event) => {
+  const input = comboInput(event.target);
+  if (input && document.activeElement === input) {
+    comboOpen(input);
+  }
+});
+
+// Pointerdown keeps focus in the input, so focusout doesn't close the list
+// before the pick.
+document.addEventListener("pointerdown", (event) => {
+  const li = event.target instanceof Element ? event.target.closest(".combo-list li[data-value]") : null;
+  if (!li) {
+    return;
+  }
+  const input = document.querySelector(`input[data-combo="${li.parentElement.id}"]`);
+  if (input) {
+    event.preventDefault();
+    comboPick(input, li);
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  const input = comboInput(event.target);
+  if (!input) {
+    return;
+  }
+  const parts = comboParts(input);
+  if (!parts) {
+    return;
+  }
+  const visible = parts.items.filter((li) => !li.hidden);
+  const current = visible.findIndex((li) => li.getAttribute("aria-selected") === "true");
+
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    if (parts.list.hidden) {
+      comboOpen(input);
+      return;
+    }
+    event.preventDefault();
+    if (visible.length === 0) {
+      return;
+    }
+    const step = event.key === "ArrowDown" ? 1 : -1;
+    const next = (current + step + visible.length) % visible.length;
+    visible[current]?.removeAttribute("aria-selected");
+    visible[next].setAttribute("aria-selected", "true");
+    visible[next].scrollIntoView({ block: "nearest" });
+  } else if (event.key === "Enter" && !parts.list.hidden && current >= 0) {
+    event.preventDefault();
+    comboPick(input, visible[current]);
+  } else if (event.key === "Escape" && !parts.list.hidden) {
+    event.preventDefault();
+    comboClose(input);
+  }
+});

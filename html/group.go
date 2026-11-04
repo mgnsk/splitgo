@@ -3,6 +3,7 @@ package html
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/mgnsk/splitgo/contract"
 	"github.com/mgnsk/splitgo/domain"
@@ -218,6 +219,9 @@ type GroupSettingsData struct {
 	Errors    url.Values
 	AddEmail  string
 	AddErrors url.Values
+	// Friends are the user's friends who aren't members, suggested when
+	// adding someone by email.
+	Friends   []*domain.User
 	InviteURL string
 	// Settled is set when the user has no balances in the group.
 	Settled bool
@@ -276,6 +280,15 @@ func GroupSettingsMain(d GroupSettingsData) Node {
 				Hint:        "They'll get an email with a link to join.",
 				Errors:      d.AddErrors,
 				Required:    true,
+				Attrs: []Node{If(len(d.Friends) > 0, Group{
+					Data("combo", "friend-emails"),
+					Role("combobox"),
+					AutoComplete("off"),
+					Aria("autocomplete", "list"),
+					Aria("controls", "friend-emails"),
+					Aria("expanded", "false"),
+				})},
+				AfterInput: If(len(d.Friends) > 0, friendSuggestions("friend-emails", d.Friends)),
 			}),
 			Div(components.SubmitButton("Add member", false)),
 		),
@@ -409,4 +422,17 @@ func (d GroupData) LedgerName() string {
 
 func ledgerLink(d GroupData) Node {
 	return A(Href(d.LedgerURL()), Text(d.LedgerName()))
+}
+
+// friendSuggestions renders a list of friends to pick an email from. app.js
+// shows it under the input with a matching data-combo attribute.
+func friendSuggestions(id string, friends []*domain.User) Node {
+	return Ul(ID(id), Class("combo-list"), Role("listbox"), Attr("hidden"),
+		Map(friends, func(u *domain.User) Node {
+			return Li(Role("option"), Data("value", u.Email),
+				Div(Text(u.DisplayName())),
+				If(strings.TrimSpace(u.Name) != "", Div(Class("muted small"), Text(u.Email))),
+			)
+		}),
+	)
 }

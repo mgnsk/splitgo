@@ -160,12 +160,24 @@ func (h *GroupHandler) renderSettings(
 ) {
 	settled, allSettled := h.settledState(r.Context(), d)
 
+	friends, err := model.ListFriends(r.Context(), h.DB, d.Me.ID)
+	if err != nil {
+		panic(err)
+	}
+	var suggest []*domain.User
+	for _, f := range friends {
+		if !slices.ContainsFunc(d.Members, func(m *domain.User) bool { return m.ID == f.User.ID }) {
+			suggest = append(suggest, f.User)
+		}
+	}
+
 	server.RenderPage(w, r, h.SM, d.Group.Name, html.GroupSettingsMain(html.GroupSettingsData{
 		GroupData:  d,
 		Form:       form,
 		Errors:     errs,
 		AddEmail:   addEmail,
 		AddErrors:  addErrs,
+		Friends:    suggest,
 		InviteURL:  fmt.Sprintf("%s/join/%s", h.Config.BaseURL, d.Group.InviteCode),
 		Settled:    settled,
 		AllSettled: allSettled,

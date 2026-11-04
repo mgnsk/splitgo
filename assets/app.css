@@ -295,6 +295,27 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
 
 /* Split options (radio cards) */
 
+/* Suggestion dropdown under an input (data-combo in app.js). */
+.combo { position: relative; }
+.combo-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0;
+  padding: 0.25rem 0;
+  list-style: none;
+  max-height: 15rem;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+.combo-list li { padding: 0.5rem 0.75rem; cursor: pointer; overflow-wrap: anywhere; }
+.combo-list li:hover, .combo-list li[aria-selected="true"] { background: var(--accent-soft); }
+
 .options { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.5rem; }
 .option {
   display: flex;

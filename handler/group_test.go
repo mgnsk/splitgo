@@ -58,6 +58,24 @@ var _ = Describe("groups", func() {
 		Expect(text(bob.get(group).body)).To(ContainSubstring("2 members"))
 	})
 
+	It("suggests friends who aren't members when adding by email", func(ctx SpecContext) {
+		mustCreateUser(ctx, "carol@example.com")
+		for _, email := range []string{"bob@example.com", "carol@example.com"} {
+			resp := alice.post("/friends", url.Values{"email": {email}}, false)
+			Expect(resp.StatusCode).To(Equal(http.StatusSeeOther), resp.body)
+		}
+
+		body := alice.get(group + "/settings").body
+		Expect(body).To(ContainSubstring(`data-combo="friend-emails"`))
+		Expect(body).To(ContainSubstring(`data-value="bob@example.com"`))
+		Expect(body).To(ContainSubstring(`data-value="carol@example.com"`))
+
+		addBob()
+		body = alice.get(group + "/settings").body
+		Expect(body).NotTo(ContainSubstring(`data-value="bob@example.com"`))
+		Expect(body).To(ContainSubstring(`data-value="carol@example.com"`))
+	})
+
 	It("rejects adding an existing member", func() {
 		addBob()
 		resp := alice.post(group+"/members", url.Values{"email": {"bob@example.com"}}, false)
