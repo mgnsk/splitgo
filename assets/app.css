@@ -312,6 +312,23 @@ input.invalid, select.invalid { border-color: var(--danger); }
 
 /* Toast */
 
+.push-prompt {
+  position: fixed;
+  left: 50%;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(32rem, calc(100% - 2rem));
+  z-index: 40;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.18);
+}
+.push-prompt p { margin: 0; }
+.push-prompt p:empty { display: none; }
+.push-prompt-title { font-weight: 650; }
+
 #toast { position: fixed; bottom: 1.25rem; left: 50%; transform: translateX(-50%); z-index: 50; }
 .toast {
   padding: 0.65rem 1rem;

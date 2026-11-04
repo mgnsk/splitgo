@@ -103,6 +103,20 @@ var _ = Describe("push notifications", func() {
 		Expect(body).To(ContainSubstring("Add to Home Screen"))
 	})
 
+	It("offers notifications on pages other than the account page", func() {
+		Expect(alice.get("/").body).To(ContainSubstring(`id="push-prompt"`))
+		Expect(text(alice.get(group).body)).To(ContainSubstring("You can change this later in Account settings."))
+		Expect(alice.get("/account").body).NotTo(ContainSubstring(`id="push-prompt"`))
+		Expect(env.newClient().get("/login").body).NotTo(ContainSubstring(`id="push-prompt"`))
+	})
+
+	It("serves the VAPID key to signed in users", func() {
+		resp := alice.get("/push/key")
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		Expect(resp.body).To(Equal("test-vapid-key"))
+		Expect(env.newClient().get("/push/key").body).NotTo(Equal("test-vapid-key"))
+	})
+
 	It("stores, moves and deletes subscriptions", func(ctx SpecContext) {
 		addBob()
 

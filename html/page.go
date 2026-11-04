@@ -57,6 +57,7 @@ func Page(props PageProps) Node {
 		Body: []Node{
 			topbar(props.User, props.Path),
 			Main(Class("container"), props.Children),
+			If(props.User != nil && props.Path != "/account", pushPrompt()),
 			Div(ID("toast"), Attr("aria-live", "polite"),
 				If(props.FlashSuccess != "", Toast(true, props.FlashSuccess)),
 			),
@@ -134,4 +135,20 @@ func pluralize(n int, singular, plural string) string {
 		return fmt.Sprintf("%d %s", n, singular)
 	}
 	return fmt.Sprintf("%d %s", n, plural)
+}
+
+// pushPrompt renders the notification offer that app.js shows once in the
+// installed app.
+func pushPrompt() Node {
+	return Div(ID("push-prompt"), Class("push-prompt stack-sm"), Hidden(""),
+		Role("dialog"), Aria("labelledby", "push-prompt-title"),
+		P(ID("push-prompt-title"), Class("push-prompt-title"), Text("Turn on notifications?")),
+		P(Text("Get notified when someone adds an expense or payment involving you, or adds you to a group.")),
+		P(Class("muted small"), Text("You can change this later in Account settings.")),
+		P(Class("small error-text"), Data("push-prompt-status", ""), Aria("live", "polite")),
+		Div(Class("row"),
+			Button(Type("button"), Class("btn btn-primary"), Data("push-prompt-enable", ""), Text("Turn on")),
+			Button(Type("button"), Class("btn"), Data("push-prompt-dismiss", ""), Text("Not now")),
+		),
+	)
 }

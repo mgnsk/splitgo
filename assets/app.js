@@ -4,6 +4,10 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(() => {});
 }
 
+// Running as the installed app rather than in a browser tab.
+const standalone =
+  window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+
 const pushSupported =
   "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 
@@ -33,6 +37,21 @@ function postSubscription(path, sub) {
 function base64UrlToBytes(s) {
   const b64 = (s + "=".repeat((4 - (s.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/");
   return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+}
+
+// subscribePush asks for permission and subscribes this device. On iOS it
+// must be called directly in a tap handler, before any other await.
+async function subscribePush(reg, vapidKey) {
+  const sub = await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: base64UrlToBytes(vapidKey),
+  });
+  try {
+    await postSubscription("/push/subscribe", sub);
+  } catch (err) {
+    await sub.unsubscribe();
+    throw err;
+  }
 }
 
 // Notification settings on the account page.
@@ -72,16 +91,7 @@ async function initPushCard(card) {
         await postSubscription("/push/unsubscribe", sub).catch(() => {});
         await sub.unsubscribe();
       } else {
-        const created = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: base64UrlToBytes(card.dataset.vapidKey),
-        });
-        try {
-          await postSubscription("/push/subscribe", created);
-        } catch (err) {
-          await created.unsubscribe();
-          throw err;
-        }
+        await subscribePush(reg, card.dataset.vapidKey);
       }
     } catch (err) {
       console.error(err);
@@ -96,6 +106,54 @@ async function initPushCard(card) {
   });
 
   await render();
+}
+
+// Offer notifications once in the installed app, where first-time users
+// would not otherwise find the switch on the account page.
+const promptDismissedKey = "push-prompt-dismissed";
+
+async function initPushPrompt(prompt) {
+  if (!pushSupported || !standalone || localStorage.getItem(promptDismissedKey)) {
+    return;
+  }
+  if (Notification.permission !== "default") {
+    return; // Already decided.
+  }
+  const reg = await navigator.serviceWorker.ready;
+  if (await reg.pushManager.getSubscription()) {
+    return;
+  }
+  const resp = await fetch("/push/key", { credentials: "same-origin" });
+  if (!resp.ok) {
+    return;
+  }
+  const vapidKey = (await resp.text()).trim();
+
+  const close = () => {
+    localStorage.setItem(promptDismissedKey, "1");
+    prompt.hidden = true;
+  };
+  const enable = prompt.querySelector("[data-push-prompt-enable]");
+  const status = prompt.querySelector("[data-push-prompt-status]");
+
+  enable.addEventListener("click", async () => {
+    enable.disabled = true;
+    try {
+      await subscribePush(reg, vapidKey);
+      close();
+    } catch (err) {
+      console.error(err);
+      if (Notification.permission === "denied") {
+        close();
+        return;
+      }
+      status.textContent = "Could not turn on notifications, please try again.";
+      enable.disabled = false;
+    }
+  });
+  prompt.querySelector("[data-push-prompt-dismiss]").addEventListener("click", close);
+
+  prompt.hidden = false;
 }
 
 // Keep the server's copy of this device's subscription current, e.g. after
@@ -135,6 +193,10 @@ document.addEventListener("submit", async (event) => {
 });
 
 document.addEventListener("DOMContentLoaded", () => {
+  const prompt = document.getElementById("push-prompt");
+  if (prompt) {
+    initPushPrompt(prompt).catch(console.error);
+  }
   const card = document.getElementById("push");
   if (card) {
     initPushCard(card).catch(console.error);
@@ -145,9 +207,6 @@ document.addEventListener("DOMContentLoaded", () => {
 // Reload the installed app when it comes back to the foreground so balances
 // and expenses are never stale. iOS resumes the app showing the page as it
 // was when it was left. Pages with unsaved form input are left alone.
-const standalone =
-  window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
-
 let formDirty = false;
 document.addEventListener("input", (event) => {
   if (event.target instanceof Element && event.target.closest("main form")) {

@@ -26,6 +26,7 @@ func NewPushHandler(deps *Deps) *PushHandler {
 
 // Register the handler.
 func (h *PushHandler) Register(mux *http.ServeMux) {
+	h.handle(mux, "GET /push/key", h.Key, true)
 	h.handle(mux, "POST /push/subscribe", h.Subscribe, true)
 	h.handle(mux, "POST /push/unsubscribe", h.Unsubscribe, true)
 }
@@ -48,6 +49,13 @@ func decodeSubscription(r *http.Request) subscriptionJSON {
 		panic(splitgo.InvalidValue.New("Unsupported push service"))
 	}
 	return s
+}
+
+// Key returns the VAPID public key to subscribe with.
+func (h *PushHandler) Key(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write([]byte(h.Push.PublicKey()))
 }
 
 // Subscribe saves the push subscription of the current device.
