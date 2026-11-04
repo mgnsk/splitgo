@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	netmail "net/mail"
 	"net/smtp"
 	"net/url"
 	"strings"
@@ -42,19 +43,27 @@ type SMTPSender struct {
 	addr     string
 	host     string
 	auth     smtp.Auth
-	from     string
-	implicit bool // implicit TLS (smtps)
+	from     string // envelope sender: bare address
+	header   string // From header: address with optional display name
+	implicit bool   // implicit TLS (smtps)
 }
 
 // NewSMTPSender creates an SMTP sender from a URL like
 // smtp://user:pass@host:587 (STARTTLS) or smtps://user:pass@host:465.
+// from is an address like "noreply@example.com" or
+// "splitgo <noreply@example.com>".
 func NewSMTPSender(rawURL, from string) (*SMTPSender, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid SMTP URL: %w", err)
 	}
 
-	s := &SMTPSender{from: from, host: u.Hostname()}
+	addr, err := ParseFrom(from)
+	if err != nil {
+		return nil, err
+	}
+
+	s := &SMTPSender{from: addr.Address, header: addr.String(), host: u.Hostname()}
 
 	switch u.Scheme {
 	case "smtp":
@@ -76,13 +85,22 @@ func NewSMTPSender(rawURL, from string) (*SMTPSender, error) {
 
 // Send sends the message.
 func (s *SMTPSender) Send(ctx context.Context, msg Message) error {
-	body := buildMessage(s.from, msg)
+	body := buildMessage(s.header, msg)
 
 	if !s.implicit {
 		return smtp.SendMail(s.addr, s.auth, s.from, []string{msg.To}, body)
 	}
 
 	return sendImplicitTLS(ctx, s, msg.To, body)
+}
+
+// ParseFrom parses a sender address, optionally with a display name.
+func ParseFrom(from string) (*netmail.Address, error) {
+	addr, err := netmail.ParseAddress(strings.TrimSpace(from))
+	if err != nil {
+		return nil, fmt.Errorf("invalid sender address %q: %w", from, err)
+	}
+	return addr, nil
 }
 
 func buildMessage(from string, msg Message) []byte {

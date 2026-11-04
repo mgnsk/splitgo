@@ -8,6 +8,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/mgnsk/splitgo/mail"
 )
 
 // Config is the application configuration.
@@ -48,8 +50,12 @@ func LoadConfig() (*Config, error) {
 		errs = append(errs, fmt.Errorf("base_url: must be an absolute http(s) URL"))
 	}
 
-	if c.SMTPURL != "" && c.MailFrom == "" {
-		errs = append(errs, fmt.Errorf("mail_from: is required when smtp_url is set"))
+	if c.SMTPURL != "" {
+		if c.MailFrom == "" {
+			errs = append(errs, fmt.Errorf("mail_from: is required when smtp_url is set"))
+		} else if _, err := mail.ParseFrom(c.MailFrom); err != nil {
+			errs = append(errs, fmt.Errorf("mail_from: %w", err))
+		}
 	}
 
 	if len(errs) > 0 {
