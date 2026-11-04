@@ -205,6 +205,8 @@ func (h *GroupHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
+	h.publishGroup(d.Group.ID, d.Members)
+
 	server.Flash(r, h.SM, "Group saved")
 	http.Redirect(w, r, groupPath(d.Group.ID)+"/settings", http.StatusSeeOther)
 }
@@ -264,6 +266,8 @@ func (h *GroupHandler) AddMember(w http.ResponseWriter, r *http.Request) {
 		URL:   groupPath(d.Group.ID),
 	})
 
+	h.publishGroup(d.Group.ID, d.Members, []*domain.User{user})
+
 	server.Flash(r, h.SM, "Member added")
 	http.Redirect(w, r, groupPath(d.Group.ID)+"/settings", http.StatusSeeOther)
 }
@@ -286,6 +290,8 @@ func (h *GroupHandler) Leave(w http.ResponseWriter, r *http.Request) {
 	if err := model.RemoveGroupMember(ctx, h.DB, d.Group.ID, me.ID); err != nil {
 		panic(err)
 	}
+
+	h.publishGroup(d.Group.ID, d.Members)
 
 	server.Flash(r, h.SM, fmt.Sprintf("You left %s", d.Group.Name))
 	server.Redirect(w, r, "/")
@@ -310,6 +316,8 @@ func (h *GroupHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
+	h.publishGroup(d.Group.ID, d.Members)
+
 	server.Flash(r, h.SM, fmt.Sprintf("Deleted %s", d.Group.Name))
 	server.Redirect(w, r, "/")
 }
@@ -332,11 +340,13 @@ func (h *GroupHandler) JoinPage(w http.ResponseWriter, r *http.Request) {
 func (h *GroupHandler) Join(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
-	group, _ := h.groupByInvite(ctx, r)
+	group, members := h.groupByInvite(ctx, r)
 
 	if err := model.AddGroupMember(ctx, h.DB, group.ID, me.ID); err != nil {
 		panic(err)
 	}
+
+	h.publishGroup(group.ID, members)
 
 	server.Flash(r, h.SM, fmt.Sprintf("Welcome to %s", group.Name))
 	http.Redirect(w, r, groupPath(group.ID), http.StatusSeeOther)

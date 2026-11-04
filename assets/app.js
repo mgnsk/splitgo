@@ -260,3 +260,75 @@ window.addEventListener("pageshow", (event) => {
     refreshIfStale();
   }
 });
+
+// Live updates: the server sends a refresh event to open pages when someone
+// changes a group of the user, and the page re-fetches its content in place.
+// Pages with unsaved input and pages being left are not touched.
+let submitting = false;
+document.addEventListener("submit", (event) => {
+  if (!event.defaultPrevented) {
+    submitting = true;
+  }
+});
+
+let liveTimer = 0;
+let livePending = false;
+
+function liveRefresh() {
+  if (submitting || navigating || formDirty) {
+    return;
+  }
+  if (document.visibilityState !== "visible") {
+    livePending = true; // Refresh when the page is shown again.
+    return;
+  }
+  // Coalesce bursts of changes into one refresh.
+  clearTimeout(liveTimer);
+  liveTimer = setTimeout(() => {
+    if (submitting || navigating || formDirty) {
+      return;
+    }
+    const url = window.location.pathname + window.location.search;
+    if (window.htmx) {
+      window.htmx
+        .ajax("GET", url, { target: "main", select: "main", swap: "outerHTML" })
+        .catch(() => window.location.reload());
+    } else {
+      window.location.reload();
+    }
+  }, 300);
+}
+
+let liveSource = null;
+
+function connectLive() {
+  if (liveSource || !window.EventSource || !document.querySelector(".topbar .nav")) {
+    return;
+  }
+  // EventSource reconnects by itself when the server ends the stream.
+  liveSource = new EventSource("/events");
+  liveSource.addEventListener("refresh", liveRefresh);
+}
+
+function disconnectLive() {
+  if (liveSource) {
+    liveSource.close();
+    liveSource = null;
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && livePending) {
+    livePending = false;
+    liveRefresh();
+  }
+});
+window.addEventListener("pagehide", disconnectLive);
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) {
+    // Back on a page that was left by submitting a form.
+    submitting = false;
+    connectLive();
+  }
+});
+document.addEventListener("DOMContentLoaded", connectLive);

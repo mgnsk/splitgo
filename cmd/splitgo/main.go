@@ -16,6 +16,7 @@ import (
 	"github.com/alexedwards/scs/bunstore"
 	"github.com/mgnsk/splitgo"
 	"github.com/mgnsk/splitgo/handler"
+	"github.com/mgnsk/splitgo/live"
 	"github.com/mgnsk/splitgo/mail"
 	"github.com/mgnsk/splitgo/model"
 	"github.com/mgnsk/splitgo/pkg/sqlite"
@@ -112,11 +113,14 @@ func run() error {
 		return splitgo.Internal.New("error creating sqlite session store", err)
 	}
 
+	broker := live.NewBroker()
+
 	deps := &handler.Deps{
 		DB:     db,
 		SM:     server.NewSessionManager(store, cfg.SecureCookies()),
 		Mailer: mailer,
 		Push:   notifier,
+		Live:   broker,
 		Config: handler.Config{
 			BaseURL:     cfg.BaseURL,
 			AllowSignup: cfg.AllowSignup,
@@ -130,6 +134,9 @@ func run() error {
 		WriteTimeout: time.Minute,
 		ErrorLog:     slog.NewLogLogger(slog.Default().Handler(), slog.LevelDebug),
 	}
+
+	// End open event streams so that shutdown does not wait for them.
+	s.RegisterOnShutdown(broker.Close)
 
 	g.Go(func() error {
 		slog.Info(fmt.Sprintf("listening at %s", cfg.ListenAddr))

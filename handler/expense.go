@@ -79,6 +79,8 @@ func (h *ExpenseHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	h.notifyExpense(r, d, e)
 
+	h.publishGroup(d.Group.ID, d.Members)
+
 	server.Flash(r, h.SM, "Expense added")
 	http.Redirect(w, r, groupPath(d.Group.ID), http.StatusSeeOther)
 }
@@ -173,6 +175,8 @@ func (h *ExpenseHandler) Update(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
+	h.publishGroup(d.Group.ID, d.Members)
+
 	server.Flash(r, h.SM, "Expense saved")
 	http.Redirect(w, r, groupPath(d.Group.ID)+"/expenses/"+e.ID.String(), http.StatusSeeOther)
 }
@@ -193,6 +197,8 @@ func (h *ExpenseHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if e.Kind == domain.KindSettlement {
 		msg = "Payment deleted"
 	}
+
+	h.publishGroup(d.Group.ID, d.Members)
 
 	server.Flash(r, h.SM, msg)
 	server.Redirect(w, r, groupPath(d.Group.ID))

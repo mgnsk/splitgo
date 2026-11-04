@@ -15,6 +15,7 @@ import (
 	"github.com/alexedwards/scs/bunstore"
 	"github.com/mgnsk/splitgo/domain"
 	"github.com/mgnsk/splitgo/handler"
+	"github.com/mgnsk/splitgo/live"
 	"github.com/mgnsk/splitgo/mail"
 	"github.com/mgnsk/splitgo/model"
 	"github.com/mgnsk/splitgo/pkg/snowflake"
@@ -83,6 +84,7 @@ type testEnv struct {
 	ts       *httptest.Server
 	mailer   *fakeMailer
 	notifier *fakeNotifier
+	live     *live.Broker
 	clock    *testClock
 }
 
@@ -93,6 +95,7 @@ func newTestEnv(allowSignup bool) *testEnv {
 	env := &testEnv{
 		mailer:   &fakeMailer{},
 		notifier: &fakeNotifier{},
+		live:     live.NewBroker(),
 		clock:    &testClock{now: time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC)},
 	}
 
@@ -101,6 +104,7 @@ func newTestEnv(allowSignup bool) *testEnv {
 		SM:     server.NewSessionManager(store, true),
 		Mailer: env.mailer,
 		Push:   env.notifier,
+		Live:   env.live,
 		Config: handler.Config{
 			BaseURL:     "https://splitgo.test",
 			AllowSignup: allowSignup,
@@ -110,6 +114,8 @@ func newTestEnv(allowSignup bool) *testEnv {
 
 	env.ts = httptest.NewTLSServer(handler.New(deps))
 	DeferCleanup(env.ts.Close)
+	// Runs before ts.Close, which waits for open event streams.
+	DeferCleanup(env.live.Close)
 
 	return env
 }
