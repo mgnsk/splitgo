@@ -36,8 +36,9 @@ const (
 )
 
 // AuthHandler handles passwordless authentication with emailed links and
-// one-time codes. Codes allow signing in from an installed app (PWA), which
-// does not share cookies with the browser that opens emailed links.
+// one-time codes. Codes allow signing in from an installed app (PWA): on iOS
+// it gets a copy of Safari's cookies only when added to the Home Screen, so a
+// link opened in the browser later does not sign the app in.
 type AuthHandler struct {
 	*Deps
 }
