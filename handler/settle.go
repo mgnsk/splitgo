@@ -98,6 +98,8 @@ func (h *SettleHandler) Settle(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
+	h.notifySettlement(r, d, e, resolved.To)
+
 	server.Flash(r, h.SM, "Payment recorded")
 	http.Redirect(w, r, groupPath(d.Group.ID), http.StatusSeeOther)
 }

@@ -22,6 +22,7 @@ import (
 	"github.com/mgnsk/splitgo/mail"
 	"github.com/mgnsk/splitgo/model"
 	"github.com/mgnsk/splitgo/pkg/snowflake"
+	"github.com/mgnsk/splitgo/push"
 	"github.com/mgnsk/splitgo/server"
 	"github.com/uptrace/bun"
 )
@@ -44,6 +45,7 @@ type Deps struct {
 	DB     *bun.DB
 	SM     *scs.SessionManager
 	Mailer mail.Sender
+	Push   push.Notifier
 	Config Config
 }
 
@@ -191,5 +193,6 @@ func New(deps *Deps) http.Handler {
 		NewGroupHandler(deps).Register,
 		NewExpenseHandler(deps).Register,
 		NewSettleHandler(deps).Register,
+		NewPushHandler(deps).Register,
 	)
 }

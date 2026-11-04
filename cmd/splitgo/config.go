@@ -65,6 +65,18 @@ func LoadConfig() (*Config, error) {
 	return c, nil
 }
 
+// PushSubscriber returns the contact sent to push services: the sender email
+// address if mail is configured, otherwise the base URL. Apple requires a
+// mailto: or https: contact.
+func (c *Config) PushSubscriber() string {
+	if c.MailFrom != "" {
+		if addr, err := mail.ParseFrom(c.MailFrom); err == nil {
+			return addr.Address
+		}
+	}
+	return c.BaseURL
+}
+
 // SecureCookies reports whether cookies should be marked Secure.
 func (c *Config) SecureCookies() bool {
 	return strings.HasPrefix(c.BaseURL, "https://")

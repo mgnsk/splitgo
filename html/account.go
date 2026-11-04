@@ -11,7 +11,7 @@ import (
 )
 
 // AccountMain renders the account page.
-func AccountMain(me *domain.User, form contract.AccountForm, errs url.Values) Node {
+func AccountMain(me *domain.User, form contract.AccountForm, errs url.Values, vapidKey string) Node {
 	return Div(Class("stack"),
 		H1(Text("Account")),
 		Form(Class("card stack"), Method("post"), Action("/account"),
@@ -37,6 +37,7 @@ func AccountMain(me *domain.User, form contract.AccountForm, errs url.Values) No
 			}),
 			Div(components.SubmitButton("Save", false)),
 		),
+		notificationsCard(vapidKey),
 		Form(Method("post"), Action("/logout"),
 			Button(Type("submit"), Class("btn"), Text("Sign out")),
 		),
@@ -49,4 +50,17 @@ func themeSelectOptions() []components.SelectOption {
 		opts[i] = components.SelectOption{Value: string(t.Value), Label: t.Label}
 	}
 	return opts
+}
+
+// notificationsCard renders the push notification switch for this device.
+// app.js fills in the status and shows the button when push is available.
+func notificationsCard(vapidKey string) Node {
+	return Div(Class("card stack-sm"), ID("push"), Data("vapid-key", vapidKey),
+		H2(Text("Notifications")),
+		P(Class("muted"), Text("Get notified on this device when someone adds an expense or payment involving you, or adds you to a group.")),
+		P(Class("muted"), Data("push-status", ""),
+			Text("Notifications are not supported in this browser. On iPhone and iPad, tap Share, then Add to Home Screen, and open splitgo from the Home Screen."),
+		),
+		Div(Button(Type("button"), Class("btn"), Data("push-toggle", ""), Hidden(""))),
+	)
 }

@@ -77,6 +77,8 @@ func (h *ExpenseHandler) Create(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
+	h.notifyExpense(r, d, e)
+
 	server.Flash(r, h.SM, "Expense added")
 	http.Redirect(w, r, groupPath(d.Group.ID), http.StatusSeeOther)
 }

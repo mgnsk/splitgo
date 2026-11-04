@@ -16,6 +16,7 @@ import (
 	"github.com/mgnsk/splitgo/mail"
 	"github.com/mgnsk/splitgo/model"
 	"github.com/mgnsk/splitgo/pkg/snowflake"
+	"github.com/mgnsk/splitgo/push"
 	"github.com/mgnsk/splitgo/server"
 	hxhttp "maragu.dev/gomponents-htmx/http"
 )
@@ -256,6 +257,12 @@ func (h *GroupHandler) AddMember(w http.ResponseWriter, r *http.Request) {
 	}); err != nil {
 		panic(err)
 	}
+
+	h.Push.Notify(ctx, []snowflake.ID{user.ID}, push.Message{
+		Title: d.Group.Name,
+		Body:  fmt.Sprintf("%s added you to %s", me.DisplayName(), d.Group.Name),
+		URL:   groupPath(d.Group.ID),
+	})
 
 	server.Flash(r, h.SM, "Member added")
 	http.Redirect(w, r, groupPath(d.Group.ID)+"/settings", http.StatusSeeOther)

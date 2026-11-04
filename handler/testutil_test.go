@@ -80,9 +80,10 @@ func (c *testClock) Advance(d time.Duration) {
 }
 
 type testEnv struct {
-	ts     *httptest.Server
-	mailer *fakeMailer
-	clock  *testClock
+	ts       *httptest.Server
+	mailer   *fakeMailer
+	notifier *fakeNotifier
+	clock    *testClock
 }
 
 func newTestEnv(allowSignup bool) *testEnv {
@@ -90,14 +91,16 @@ func newTestEnv(allowSignup bool) *testEnv {
 	Expect(err).NotTo(HaveOccurred())
 
 	env := &testEnv{
-		mailer: &fakeMailer{},
-		clock:  &testClock{now: time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC)},
+		mailer:   &fakeMailer{},
+		notifier: &fakeNotifier{},
+		clock:    &testClock{now: time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC)},
 	}
 
 	deps := &handler.Deps{
 		DB:     db,
 		SM:     server.NewSessionManager(store, true),
 		Mailer: env.mailer,
+		Push:   env.notifier,
 		Config: handler.Config{
 			BaseURL:     "https://splitgo.test",
 			AllowSignup: allowSignup,

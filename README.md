@@ -21,6 +21,7 @@ with SQLite, [htmx](https://htmx.org) and [gomponents](https://www.gomponents.co
 - An activity feed
 - Light and dark mode
 - Installable as an app (PWA). Sign in inside the installed app with the emailed code: on iOS the app does not share cookies with the browser that opens links. Installing requires HTTPS (or localhost).
+- Push notifications when someone adds an expense or payment involving you, or adds you to a group. Turn them on per device under Account. On iPhone and iPad (iOS 16.4+) they only work in the app added to the Home Screen, not in a Safari tab. The server generates its VAPID keys on first start and stores them in the database; push services see `MAIL_FROM` (or `BASE_URL`) as the contact.
 
 ## Running
 

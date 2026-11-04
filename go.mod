@@ -3,6 +3,7 @@ module github.com/mgnsk/splitgo
 go 1.26.0
 
 require (
+	github.com/SherClockHolmes/webpush-go v1.4.0
 	github.com/alexedwards/scs/bunstore v0.0.0-20250205215704-2e2c681ccff8
 	github.com/alexedwards/scs/v2 v2.9.0
 	github.com/bwmarrin/snowflake v0.3.0
@@ -42,6 +43,7 @@ require (
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gohugoio/hugo v0.149.1 // indirect
+	github.com/golang-jwt/jwt/v5 v5.2.3 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/pprof v0.0.0-20261016150608-1facf8f91b50 // indirect
 	github.com/google/uuid v1.6.0 // indirect

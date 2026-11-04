@@ -114,6 +114,7 @@ p { margin: 0; }
 
 .stack { display: flex; flex-direction: column; gap: 1rem; }
 .stack-sm { display: flex; flex-direction: column; gap: 0.5rem; }
+[hidden] { display: none !important; }
 .row { display: flex; align-items: center; gap: 0.75rem; }
 .row-between { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
 .wrap { flex-wrap: wrap; }

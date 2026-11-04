@@ -19,6 +19,7 @@ import (
 	"github.com/mgnsk/splitgo/mail"
 	"github.com/mgnsk/splitgo/model"
 	"github.com/mgnsk/splitgo/pkg/sqlite"
+	"github.com/mgnsk/splitgo/push"
 	"github.com/mgnsk/splitgo/server"
 	"golang.org/x/sync/errgroup"
 )
@@ -100,6 +101,12 @@ func run() error {
 		}
 	})
 
+	notifier, err := push.New(ctx, db, cfg.PushSubscriber())
+	if err != nil {
+		return splitgo.Internal.New("error configuring push notifications", err)
+	}
+	defer notifier.Wait()
+
 	store, err := bunstore.New(db)
 	if err != nil {
 		return splitgo.Internal.New("error creating sqlite session store", err)
@@ -109,6 +116,7 @@ func run() error {
 		DB:     db,
 		SM:     server.NewSessionManager(store, cfg.SecureCookies()),
 		Mailer: mailer,
+		Push:   notifier,
 		Config: handler.Config{
 			BaseURL:     cfg.BaseURL,
 			AllowSignup: cfg.AllowSignup,

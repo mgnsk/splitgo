@@ -117,13 +117,13 @@ func (h *HomeHandler) Account(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == http.MethodGet {
 		form := contract.AccountForm{Name: me.Name, Currency: me.Currency, Theme: string(me.Theme)}
-		server.RenderPage(w, r, h.SM, "Account", html.AccountMain(me, form, nil))
+		server.RenderPage(w, r, h.SM, "Account", html.AccountMain(me, form, nil, h.Push.PublicKey()))
 		return
 	}
 
 	req := decode[contract.AccountForm](r)
 	if errs := req.Validate(); len(errs) > 0 {
-		server.RenderPage(w, r, h.SM, "Account", html.AccountMain(me, *req, errs))
+		server.RenderPage(w, r, h.SM, "Account", html.AccountMain(me, *req, errs, h.Push.PublicKey()))
 		return
 	}
 
