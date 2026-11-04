@@ -147,3 +147,31 @@ func Capitalize(s string) string {
 	}
 	return strings.ToUpper(s[:1]) + s[1:]
 }
+
+// CodeForm signs in with an emailed one-time code.
+type CodeForm struct {
+	Email string `in:"form=email"`
+	Code  string `in:"form=code"`
+	Next  string `in:"form=next"`
+}
+
+// Validate the form. It normalizes the code by removing spaces and dashes.
+func (f *CodeForm) Validate() url.Values {
+	errs := url.Values{}
+
+	f.Code = strings.Map(func(r rune) rune {
+		if r == ' ' || r == '-' {
+			return -1
+		}
+		return r
+	}, f.Code)
+
+	if len(f.Code) != 6 || strings.Trim(f.Code, "0123456789") != "" {
+		errs.Set("code", "Enter the 6-digit code from the email")
+	}
+
+	f.Email = strings.TrimSpace(f.Email)
+	validateEmail(errs, "email", f.Email)
+
+	return errs
+}

@@ -241,7 +241,7 @@ func (h *GroupHandler) AddMember(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	link, err := h.createLoginLink(ctx, email, groupPath(d.Group.ID), InviteTokenTTL)
+	link, _, err := h.createLogin(ctx, email, groupPath(d.Group.ID), InviteTokenTTL, false)
 	if err != nil {
 		panic(err)
 	}

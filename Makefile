@@ -44,3 +44,11 @@ build:
 .PHONY: docker
 docker:
 	docker build -t splitgo:edge .
+
+# Regenerate PWA icons from SVG sources (requires rsvg-convert).
+.PHONY: icons
+icons:
+	rsvg-convert -w 192 -h 192 assets/favicon.svg -o assets/icons/icon-192.png
+	rsvg-convert -w 512 -h 512 assets/favicon.svg -o assets/icons/icon-512.png
+	rsvg-convert -w 512 -h 512 assets/icons/maskable.svg -o assets/icons/icon-maskable-512.png
+	rsvg-convert -w 180 -h 180 assets/icons/maskable.svg -o assets/icons/apple-touch-icon.png

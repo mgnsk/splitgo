@@ -237,3 +237,20 @@ func text(html string) string {
 	html = strings.NewReplacer("&#39;", "'", "&amp;", "&", "&quot;", `"`).Replace(html)
 	return strings.Join(strings.Fields(html), " ")
 }
+
+var codeRe = regexp.MustCompile(`sign-in code is:\s+(\d{6})`)
+
+// lastCodeTo returns the last sign-in code emailed to addr.
+func (m *fakeMailer) lastCodeTo(addr string) string {
+	GinkgoHelper()
+	msgs := m.messages()
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if msgs[i].To == addr {
+			match := codeRe.FindStringSubmatch(msgs[i].Body)
+			Expect(match).To(HaveLen(2))
+			return match[1]
+		}
+	}
+	Fail("no email sent to " + addr)
+	return ""
+}

@@ -42,3 +42,26 @@ var ThemeOptions = []struct {
 	{domain.ThemeLight, "Light"},
 	{domain.ThemeDark, "Dark"},
 }
+
+// Browser UI colors matching the top bar in each theme.
+const (
+	themeColorLight = "#ffffff"
+	themeColorDark  = "#171a20"
+)
+
+// themeColor renders the theme-color meta tags for the browser and
+// installed app UI, following the user's theme or the OS setting.
+func themeColor(user *domain.User) Node {
+	if user != nil {
+		switch user.Theme {
+		case domain.ThemeLight:
+			return Meta(Name("theme-color"), Content(themeColorLight))
+		case domain.ThemeDark:
+			return Meta(Name("theme-color"), Content(themeColorDark))
+		}
+	}
+	return Group{
+		Meta(Name("theme-color"), Content(themeColorLight), Attr("media", "(prefers-color-scheme: light)")),
+		Meta(Name("theme-color"), Content(themeColorDark), Attr("media", "(prefers-color-scheme: dark)")),
+	}
+}

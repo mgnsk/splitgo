@@ -18,8 +18,9 @@ func NewSessionManager(store scs.Store, secure bool) *scs.SessionManager {
 	sm := scs.New()
 	sm.Store = store
 	sm.HashTokenInStore = true
-	sm.Lifetime = 12 * 30 * 24 * time.Hour // 12 months
-	sm.IdleTimeout = 30 * 24 * time.Hour   // 30 days
+	// Long sessions so the installed app (PWA) stays signed in. No idle
+	// timeout: the session lasts a year from sign-in.
+	sm.Lifetime = 365 * 24 * time.Hour
 	sm.Cookie.Name = "session_id"
 	sm.Cookie.Domain = ""
 	sm.Cookie.HttpOnly = true

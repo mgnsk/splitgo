@@ -6,7 +6,7 @@ with SQLite, [htmx](https://htmx.org) and [gomponents](https://www.gomponents.co
 
 ## Features
 
-- Passwordless sign-in with email magic links
+- Passwordless sign-in: the email contains a one-time code and a sign-in link. Sessions last a year.
 - Groups, with invite links or adding people by email
 - Expenses in any currency. The simple view offers quick options:
   - you paid, split equally
@@ -19,6 +19,8 @@ with SQLite, [htmx](https://htmx.org) and [gomponents](https://www.gomponents.co
 - Settle up, including partial payments
 - Optional debt simplification per group
 - An activity feed
+- Light and dark mode
+- Installable as an app (PWA). Sign in inside the installed app with the emailed code: on iOS the app does not share cookies with the browser that opens links. Installing requires HTTPS (or localhost).
 
 ## Running
 
@@ -26,7 +28,7 @@ with SQLite, [htmx](https://htmx.org) and [gomponents](https://www.gomponents.co
 DATABASE_DIR=./data BASE_URL=http://localhost:8080 go run ./cmd/splitgo
 ```
 
-Migrations run automatically on startup. Without `SMTP_URL`, sign-in links are printed to the log.
+Migrations run automatically on startup. Without `SMTP_URL`, sign-in emails (code and link) are printed to the log.
 
 | Variable       | Default | Description                                                                 |
 | -------------- | ------- | --------------------------------------------------------------------------- |

@@ -32,11 +32,35 @@ func LoginMain(email, next string, errs url.Values) Node {
 	)
 }
 
-// CheckEmailMain renders the page shown after requesting a sign-in link.
-func CheckEmailMain(email string) Node {
-	return Div(Class("card stack-sm"),
-		H1(Text("Check your email")),
-		P(Text("If "), Strong(Text(email)), Text(" can sign in, a sign-in link is on its way. It expires in 15 minutes.")),
+// CheckEmailMain renders the page shown after requesting a sign-in link, with
+// a form to enter the emailed code instead.
+func CheckEmailMain(email, next string, errs url.Values) Node {
+	return Div(Class("stack"),
+		Div(Class("stack-sm"),
+			H1(Text("Check your email")),
+			P(Text("If "), Strong(Text(email)), Text(" can sign in, a code and a sign-in link are on their way. They expire in 15 minutes.")),
+		),
+		Form(Class("card stack"), Method("post"), Action("/login/code"),
+			Input(Type("hidden"), Name("email"), Value(email)),
+			Input(Type("hidden"), Name("next"), Value(next)),
+			components.Field(components.FieldProps{
+				Label:       "Sign-in code",
+				Name:        "code",
+				Placeholder: "123456",
+				Hint:        "Enter the code here, or open the link in the email.",
+				Errors:      errs,
+				Required:    true,
+				Attrs: []Node{
+					Class("input-code"),
+					Attr("inputmode", "numeric"),
+					AutoComplete("one-time-code"),
+					MaxLength("7"),
+					AutoFocus(),
+				},
+			}),
+			components.ErrorText(errs.Get("email")),
+			components.SubmitButton("Sign in", true),
+		),
 		P(Class("muted small"), A(Href("/login"), Text("Use a different email"))),
 	)
 }

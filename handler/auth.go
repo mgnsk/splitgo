@@ -2,9 +2,11 @@ package handler
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/big"
 	"net/http"
 	"net/url"
 	"time"
@@ -21,15 +23,20 @@ import (
 )
 
 const (
-	// LoginTokenTTL is the lifetime of sign-in links.
+	// LoginTokenTTL is the lifetime of sign-in links and codes.
 	LoginTokenTTL = 15 * time.Minute
 	// InviteTokenTTL is the lifetime of sign-in links sent with invitations.
 	InviteTokenTTL = 7 * 24 * time.Hour
 	// loginRateLimit is the minimum interval between sign-in emails per address.
 	loginRateLimit = time.Minute
+	// maxLoginFailures is the number of wrong codes per address within
+	// model.LoginFailureWindow after which codes are refused. Links still work.
+	maxLoginFailures = 20
 )
 
-// AuthHandler handles magic link authentication.
+// AuthHandler handles passwordless authentication with emailed links and
+// one-time codes. Codes allow signing in from an installed app (PWA), which
+// does not share cookies with the browser that opens emailed links.
 type AuthHandler struct {
 	*Deps
 }
@@ -43,6 +50,7 @@ func NewAuthHandler(deps *Deps) *AuthHandler {
 func (h *AuthHandler) Register(mux *http.ServeMux) {
 	h.handle(mux, "GET /login", h.LoginPage, false)
 	h.handle(mux, "POST /login", h.Login, false)
+	h.handle(mux, "POST /login/code", h.Code, false)
 	h.handle(mux, "GET /login/{token}", h.ConfirmPage, false)
 	h.handle(mux, "POST /login/{token}", h.Confirm, false)
 	h.handle(mux, "POST /logout", h.Logout, false)
@@ -58,7 +66,7 @@ func (h *AuthHandler) LoginPage(w http.ResponseWriter, r *http.Request) {
 	server.RenderPage(w, r, h.SM, "Sign in", html.LoginMain("", safeNext(r.URL.Query().Get("next")), nil))
 }
 
-// Login emails a sign-in link.
+// Login emails a sign-in link and code.
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	req := decode[contract.LoginForm](r)
 	next := safeNext(req.Next)
@@ -76,7 +84,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if allowed {
-		if err := h.sendLoginLink(r.Context(), email, next); err != nil {
+		if err := h.sendLoginEmail(r.Context(), email, next); err != nil {
 			panic(err)
 		}
 	} else {
@@ -84,10 +92,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Always show the same page to not reveal which emails have accounts.
-	server.RenderPage(w, r, h.SM, "Check your email", html.CheckEmailMain(email))
+	server.RenderPage(w, r, h.SM, "Check your email", html.CheckEmailMain(email, next, nil))
 }
 
-func (h *AuthHandler) sendLoginLink(ctx context.Context, email, next string) error {
+func (h *AuthHandler) sendLoginEmail(ctx context.Context, email, next string) error {
 	last, err := model.LastLoginTokenTime(ctx, h.DB, email)
 	if err != nil {
 		return err
@@ -98,34 +106,57 @@ func (h *AuthHandler) sendLoginLink(ctx context.Context, email, next string) err
 		return nil
 	}
 
-	link, err := h.createLoginLink(ctx, email, next, LoginTokenTTL)
+	link, code, err := h.createLogin(ctx, email, next, LoginTokenTTL, true)
 	if err != nil {
 		return err
 	}
 
 	return h.Mailer.Send(ctx, mail.Message{
 		To:      email,
-		Subject: "Your splitgo sign-in link",
-		Body: fmt.Sprintf("Hi,\n\nUse this link to sign in to splitgo:\n\n%s\n\n"+
-			"The link expires in 15 minutes and can be used once.\n"+
-			"If you didn't request it, you can ignore this email.\n", link),
+		Subject: fmt.Sprintf("Your splitgo sign-in code: %s", code),
+		Body: fmt.Sprintf("Hi,\n\nYour splitgo sign-in code is:\n\n    %s\n\n"+
+			"Or use this link to sign in:\n\n%s\n\n"+
+			"The code and link expire in 15 minutes and can be used once.\n"+
+			"If you didn't request them, you can ignore this email.\n", code, link),
 	})
 }
 
-// createLoginLink stores a new login token and returns the sign-in URL.
-func (d *Deps) createLoginLink(ctx context.Context, email, next string, ttl time.Duration) (string, error) {
+// createLogin stores a new login token and returns the sign-in URL and, if
+// withCode is set, a 6-digit one-time code.
+func (d *Deps) createLogin(ctx context.Context, email, next string, ttl time.Duration, withCode bool) (link, code string, err error) {
 	token := randomToken(32)
+	tokenHash := hashToken(token)
 
-	if err := model.InsertLoginToken(ctx, d.DB, hashToken(token), email, d.now(), ttl); err != nil {
-		return "", err
+	var codeHash string
+	if withCode {
+		code = randomCode()
+		codeHash = hashCode(tokenHash, code)
 	}
 
-	link := fmt.Sprintf("%s/login/%s", d.Config.BaseURL, token)
+	if err := model.InsertLoginToken(ctx, d.DB, tokenHash, codeHash, email, d.now(), ttl); err != nil {
+		return "", "", err
+	}
+
+	link = fmt.Sprintf("%s/login/%s", d.Config.BaseURL, token)
 	if next != "/" && next != "" {
 		link += "?next=" + url.QueryEscape(next)
 	}
 
-	return link, nil
+	return link, code, nil
+}
+
+// randomCode returns a random 6-digit code.
+func randomCode() string {
+	n, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
+	if err != nil {
+		panic(err)
+	}
+	return fmt.Sprintf("%06d", n.Int64())
+}
+
+// hashCode hashes a code bound to its token.
+func hashCode(tokenHash, code string) string {
+	return hashToken(tokenHash + ":" + code)
 }
 
 // canSignIn reports whether email may sign in.
@@ -147,6 +178,48 @@ func (h *AuthHandler) canSignIn(ctx context.Context, email string) (bool, error)
 	}
 
 	return n == 0, nil
+}
+
+// Code signs in with an emailed one-time code.
+func (h *AuthHandler) Code(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	req := decode[contract.CodeForm](r)
+	next := safeNext(req.Next)
+	email := domain.NormalizeEmail(req.Email)
+
+	render := func(msg string) {
+		server.RenderPage(w, r, h.SM, "Check your email", html.CheckEmailMain(email, next, url.Values{"code": {msg}}))
+	}
+
+	if errs := req.Validate(); len(errs) > 0 {
+		server.RenderPage(w, r, h.SM, "Check your email", html.CheckEmailMain(email, next, errs))
+		return
+	}
+
+	failures, err := model.CountLoginFailures(ctx, h.DB, email, h.now().Add(-model.LoginFailureWindow))
+	if err != nil {
+		panic(err)
+	}
+	if failures >= maxLoginFailures {
+		render("Too many wrong codes. Use the link in the email instead.")
+		return
+	}
+
+	err = model.ConsumeLoginCode(ctx, h.DB, email, func(tokenHash string) string {
+		return hashCode(tokenHash, req.Code)
+	}, h.now())
+	switch {
+	case errors.Is(err, splitgo.NotFound):
+		render("This code has expired. Request a new one.")
+		return
+	case errors.Is(err, splitgo.InvalidValue):
+		render("Wrong code. Check the email and try again.")
+		return
+	case err != nil:
+		panic(err)
+	}
+
+	h.signIn(w, r, email, next)
 }
 
 // ConfirmPage renders a page asking to confirm the sign in. Confirming with
@@ -174,9 +247,8 @@ func (h *AuthHandler) ConfirmPage(w http.ResponseWriter, r *http.Request) {
 // Confirm consumes the sign-in token and logs the user in.
 func (h *AuthHandler) Confirm(w http.ResponseWriter, r *http.Request) {
 	req := decode[contract.TokenPath](r)
-	ctx := r.Context()
 
-	email, err := model.ConsumeLoginToken(ctx, h.DB, hashToken(req.Token), h.now())
+	email, err := model.ConsumeLoginToken(r.Context(), h.DB, hashToken(req.Token), h.now())
 	if err != nil {
 		if errors.Is(err, splitgo.NotFound) {
 			server.RenderPage(w, r, h.SM, "Link expired", html.InvalidLinkMain())
@@ -184,6 +256,14 @@ func (h *AuthHandler) Confirm(w http.ResponseWriter, r *http.Request) {
 		}
 		panic(err)
 	}
+
+	h.signIn(w, r, email, safeNext(r.URL.Query().Get("next")))
+}
+
+// signIn logs in the user with a verified email, creating the account if
+// allowed, and redirects to next.
+func (h *AuthHandler) signIn(w http.ResponseWriter, r *http.Request, email, next string) {
+	ctx := r.Context()
 
 	user, err := model.GetUserByEmail(ctx, h.DB, email)
 	if err != nil {
@@ -214,7 +294,7 @@ func (h *AuthHandler) Confirm(w http.ResponseWriter, r *http.Request) {
 	// Then make the privilege-level change.
 	h.SM.Put(ctx, server.SessionKeyUserID, user.ID.Int64())
 
-	http.Redirect(w, r, safeNext(r.URL.Query().Get("next")), http.StatusSeeOther)
+	http.Redirect(w, r, next, http.StatusSeeOther)
 }
 
 // Logout logs out.
