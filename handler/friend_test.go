@@ -102,7 +102,7 @@ var _ = Describe("friends", func() {
 
 		t := text(alice.get(friendPage).body)
 		Expect(t).To(ContainSubstring("bob owes you €10.00"))
-		Expect(t).To(ContainSubstring("Settle up Non-group bob owes you €10.00 Settle up"))
+		Expect(t).To(ContainSubstring("Settle up You and bob bob owes you €10.00 Settle up"))
 		Expect(t).To(ContainSubstring("Lunch You paid €20.00"))
 
 		Expect(text(alice.get("/").body)).To(ContainSubstring("bob you are owed €10.00"))
@@ -130,7 +130,7 @@ var _ = Describe("friends", func() {
 		page := alice.get(friendPage).body
 		t := text(page)
 		Expect(t).To(ContainSubstring("bob owes you €7.00"))
-		Expect(t).To(ContainSubstring("Non-group bob owes you €10.00"))
+		Expect(t).To(ContainSubstring("You and bob bob owes you €10.00"))
 		Expect(t).To(ContainSubstring("Trip You owe bob €3.00"))
 		Expect(page).To(ContainSubstring(g + "/settle?amount=10.00&amp;currency=EUR&amp;from=" + bobU.ID.String() + "&amp;to=" + aliceU.ID.String()))
 
@@ -142,7 +142,7 @@ var _ = Describe("friends", func() {
 		Expect(resp.Header.Get("Location")).To(Equal("/friends/" + aliceU.ID.String()))
 
 		t = text(alice.get(friendPage).body)
-		Expect(t).NotTo(ContainSubstring("Non-group"))
+		Expect(t).NotTo(ContainSubstring("You and bob"))
 		Expect(t).To(ContainSubstring("Trip You owe bob €3.00"))
 	})
 

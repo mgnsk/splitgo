@@ -82,7 +82,7 @@ func FriendMain(d FriendData) Node {
 					Map(d.Debts, func(debt domain.Debt) Node {
 						label := d.Labels[debt.GroupID]
 						if debt.GroupID == d.DirectGroupID {
-							label = "Non-group"
+							label = "You and " + name
 						}
 						amount := debt.Amount
 						if debt.From == d.Me.ID {
