@@ -133,6 +133,15 @@ func IsGroupMember(ctx context.Context, db bun.IDB, groupID, userID snowflake.ID
 	return ok, sqlite.NormalizeError(err)
 }
 
+// SharesGroup reports whether two users are members of a common group.
+func SharesGroup(ctx context.Context, db bun.IDB, a, b snowflake.ID) (bool, error) {
+	ok, err := db.NewSelect().Model((*GroupMember)(nil)).
+		Where("user_id = ?", a).
+		Where("group_id IN (SELECT group_id FROM group_members WHERE user_id = ?)", b).
+		Exists(ctx)
+	return ok, sqlite.NormalizeError(err)
+}
+
 func groupFromDomain(g *domain.Group) *Group {
 	return &Group{
 		ID:            g.ID,

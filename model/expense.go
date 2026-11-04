@@ -128,6 +128,16 @@ func ListUserExpenses(ctx context.Context, db bun.IDB, userID snowflake.ID, afte
 	})
 }
 
+// ListUserExpensesWith lists non-deleted expenses in the user's groups that
+// involve both the user and friend, newest first.
+func ListUserExpensesWith(ctx context.Context, db bun.IDB, userID, friendID snowflake.ID, after *ExpenseCursor, limit int) ([]*domain.Expense, error) {
+	return listExpenses(ctx, db, after, limit, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Where("e.group_id IN (SELECT group_id FROM group_members WHERE user_id = ?)", userID).
+			WhereGroup(" AND ", involves(userID)).
+			WhereGroup(" AND ", involves(friendID))
+	})
+}
+
 func involves(userID snowflake.ID) func(q *bun.SelectQuery) *bun.SelectQuery {
 	return func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where("e.paid_by = ?", userID).

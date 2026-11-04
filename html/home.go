@@ -45,7 +45,7 @@ func HomeMain(d HomeData) Node {
 			Ul(Class("list"),
 				If(len(d.Balances) == 0, emptyItem("You're all settled up.")),
 				Map(d.Balances, func(b domain.Balance) Node {
-					return Li(Div(Class("list-item"),
+					return Li(A(Class("list-item"), Href("/activity?with="+b.UserID.String()),
 						Avatar(d.People.name(b.UserID)),
 						Div(Class("grow"),
 							Div(Class("title"), Text(d.People.name(b.UserID))),

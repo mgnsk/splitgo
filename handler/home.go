@@ -85,17 +85,27 @@ func (h *HomeHandler) Home(w http.ResponseWriter, r *http.Request) {
 	}))
 }
 
-// Activity renders recent expenses across all of the user's groups.
+// Activity renders recent expenses across all of the user's groups, or
+// those shared with one friend when the with query parameter is set.
 func (h *HomeHandler) Activity(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
 
-	expenses, err := model.ListUserExpenses(ctx, h.DB, me.ID, nil, activityLimit)
+	groups, err := model.ListUserGroups(ctx, h.DB, me.ID)
 	if err != nil {
 		panic(err)
 	}
 
-	groups, err := model.ListUserGroups(ctx, h.DB, me.ID)
+	if q := r.URL.Query().Get("with"); q != "" {
+		friendID, ok := parseFormID(q)
+		if !ok || friendID == me.ID {
+			panic(splitgo.NotFound.New("Friend not found"))
+		}
+		h.friendActivity(w, r, me, friendID, groups)
+		return
+	}
+
+	expenses, err := model.ListUserExpenses(ctx, h.DB, me.ID, nil, activityLimit)
 	if err != nil {
 		panic(err)
 	}
@@ -109,6 +119,53 @@ func (h *HomeHandler) Activity(w http.ResponseWriter, r *http.Request) {
 	h.addPeople(ctx, people, expensePeopleIDs(expenses...))
 
 	server.RenderPage(w, r, h.SM, "Activity", html.ActivityMain(me, expenses, groupsByID, people))
+}
+
+func (h *HomeHandler) friendActivity(w http.ResponseWriter, r *http.Request, me *domain.User, friendID snowflake.ID, groups []*domain.Group) {
+	ctx := r.Context()
+
+	expenses, err := model.ListUserExpensesWith(ctx, h.DB, me.ID, friendID, nil, activityLimit)
+	if err != nil {
+		panic(err)
+	}
+
+	// Only show people the user shares a group or expenses with.
+	if len(expenses) == 0 {
+		shares, err := model.SharesGroup(ctx, h.DB, me.ID, friendID)
+		if err != nil {
+			panic(err)
+		}
+		if !shares {
+			panic(splitgo.NotFound.New("Friend not found"))
+		}
+	}
+
+	debts, err := model.UserDebts(ctx, h.DB, me.ID, groups)
+	if err != nil {
+		panic(err)
+	}
+
+	var balances []domain.Balance
+	for _, b := range domain.Balances(me.ID, debts) {
+		if b.UserID == friendID {
+			balances = append(balances, b)
+		}
+	}
+
+	groupsByID := map[snowflake.ID]*domain.Group{}
+	for _, g := range groups {
+		groupsByID[g.ID] = g
+	}
+
+	people := html.People{me.ID: me}
+	h.addPeople(ctx, people, append(expensePeopleIDs(expenses...), friendID))
+
+	friend, ok := people[friendID]
+	if !ok {
+		panic(splitgo.NotFound.New("Friend not found"))
+	}
+
+	server.RenderPage(w, r, h.SM, friend.DisplayName(), html.FriendActivityMain(me, friend, balances, expenses, groupsByID, people))
 }
 
 // Account renders and updates the account settings.
