@@ -3,6 +3,8 @@ package domain
 
 import (
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/mgnsk/splitgo/pkg/snowflake"
 )
@@ -14,6 +16,35 @@ type User struct {
 	Name     string
 	Currency string
 	Theme    Theme
+	// Timezone is the IANA time zone of the user's browser, or empty.
+	Timezone string
+}
+
+var locations sync.Map
+
+// Location returns the user's time zone, or the server's if unknown.
+func (u *User) Location() *time.Location {
+	if u.Timezone == "" {
+		return time.Local
+	}
+	if loc, ok := locations.Load(u.Timezone); ok {
+		return loc.(*time.Location)
+	}
+	loc, err := time.LoadLocation(u.Timezone)
+	if err != nil {
+		return time.Local
+	}
+	locations.Store(u.Timezone, loc)
+	return loc
+}
+
+// ValidTimezone reports whether tz is a known IANA time zone name.
+func ValidTimezone(tz string) bool {
+	if tz == "" || tz == "Local" || len(tz) > 64 {
+		return false
+	}
+	_, err := time.LoadLocation(tz)
+	return err == nil
 }
 
 // Theme is a color theme preference.

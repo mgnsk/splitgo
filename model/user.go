@@ -18,6 +18,7 @@ type User struct {
 	Name     string       `bun:"name"`
 	Currency string       `bun:"currency"`
 	Theme    string       `bun:"theme"`
+	Timezone string       `bun:"timezone"`
 
 	bun.BaseModel `bun:"users"`
 }
@@ -33,6 +34,15 @@ func UpdateUser(ctx context.Context, db bun.IDB, user *domain.User) error {
 		Column("name", "currency", "theme").
 		WherePK().
 		Exec(ctx))
+}
+
+// SetUserTimezone saves the user's time zone.
+func SetUserTimezone(ctx context.Context, db bun.IDB, userID snowflake.ID, tz string) error {
+	_, err := db.NewUpdate().Model((*User)(nil)).
+		Set("timezone = ?", tz).
+		Where("id = ?", userID).
+		Exec(ctx)
+	return sqlite.NormalizeError(err)
 }
 
 // GetUser returns a user by ID.
@@ -84,6 +94,7 @@ func userFromDomain(u *domain.User) *User {
 		Name:     u.Name,
 		Currency: u.Currency,
 		Theme:    themeOrDefault(u.Theme),
+		Timezone: u.Timezone,
 	}
 }
 
@@ -94,6 +105,7 @@ func userToDomain(m *User) *domain.User {
 		Name:     m.Name,
 		Currency: m.Currency,
 		Theme:    domain.Theme(themeOrDefault(domain.Theme(m.Theme))),
+		Timezone: m.Timezone,
 	}
 }
 

@@ -84,7 +84,7 @@ func run() error {
 		return nil
 	})
 
-	// Run expired login tokens cleanup periodic task.
+	// Run expired login tokens and old invites cleanup periodic task.
 	g.Go(func() error {
 		ticker := time.NewTicker(5 * time.Minute)
 		defer ticker.Stop()
@@ -96,6 +96,9 @@ func run() error {
 
 			case now := <-ticker.C:
 				if err := model.DeleteExpiredLoginTokens(ctx, db, now); err != nil {
+					return err
+				}
+				if err := model.DeleteOldInvites(ctx, db, now); err != nil {
 					return err
 				}
 			}

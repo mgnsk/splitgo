@@ -405,7 +405,7 @@ func ExpenseDetailMain(d GroupData, e *domain.Expense) Node {
 			),
 			P(Class("muted small"),
 				Textf("Added by %s", lower(d.People.Name(e.AddedBy, me))),
-				If(!e.UpdatedAt.IsZero(), Textf(" · updated %s", e.UpdatedAt.Format("2 Jan 2006"))),
+				If(!e.UpdatedAt.IsZero(), Textf(" · updated %s", e.UpdatedAt.In(d.Me.Location()).Format("2 Jan 2006"))),
 			),
 		),
 		Div(Class("row"),

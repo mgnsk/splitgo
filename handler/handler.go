@@ -58,6 +58,11 @@ func (d *Deps) now() time.Time {
 	return time.Now()
 }
 
+// userNow returns the current time in the user's time zone.
+func (d *Deps) userNow(user *domain.User) time.Time {
+	return d.now().In(user.Location())
+}
+
 // middlewares returns the common middlewares for pages.
 func (d *Deps) middlewares(requireUser bool) []server.MiddlewareFunc {
 	mws := []server.MiddlewareFunc{

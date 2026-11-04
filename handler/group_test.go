@@ -136,13 +136,60 @@ var _ = Describe("groups", func() {
 		Expect(text(alice.get(group).body)).To(ContainSubstring("bob paid you €5.00"))
 	})
 
-	It("lets only the creator delete a settled group", func() {
+	It("lets any member delete a settled group, even after the creator left", func() {
 		addBob()
-		Expect(bob.post(group+"/delete", nil, true).StatusCode).To(Equal(http.StatusForbidden))
-
-		resp := alice.post(group+"/delete", nil, true)
+		resp := alice.post(group+"/leave", nil, true)
 		Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
-		Expect(alice.get(group).StatusCode).To(Equal(http.StatusNotFound))
+
+		// Bob is the last member and not the creator.
+		body := bob.get(group + "/settings").body
+		Expect(body).To(MatchRegexp(`<button type="button" class="btn btn-danger" hx-post="[^"]+/delete"[^>]*>Delete group`))
+
+		resp = bob.post(group+"/delete", nil, true)
+		Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
+		Expect(bob.get(group).StatusCode).To(Equal(http.StatusNotFound))
+	})
+
+	It("records payments with former members who still have debts", func(ctx SpecContext) {
+		addBob()
+		carol := mustCreateUser(ctx, "carol@example.com")
+		Expect(alice.post(group+"/members", url.Values{"email": {"carol@example.com"}}, false).StatusCode).To(Equal(http.StatusSeeOther))
+		resp := alice.post(group+"/settings", url.Values{"name": {"Trip"}, "currency": {"EUR"}, "simplify_debts": {"true"}}, false)
+		Expect(resp.StatusCode).To(Equal(http.StatusSeeOther))
+
+		// Bob owes Alice 10, Carol owes Bob 10; Carol pays Alice and Bob leaves.
+		alice.addExpense(group, url.Values{"amount": {"10"}, "mode": {"advanced"}, "split_type": {"equal"},
+			"paid_by": {aliceU.ID.String()}, "included": {bobU.ID.String()}})
+		alice.addExpense(group, url.Values{"amount": {"10"}, "mode": {"advanced"}, "split_type": {"equal"},
+			"paid_by": {bobU.ID.String()}, "included": {carol.ID.String()}})
+		Expect(alice.post(group+"/settle", url.Values{
+			"from": {carol.ID.String()}, "to": {aliceU.ID.String()},
+			"amount": {"10"}, "currency": {"EUR"}, "date": {"2026-11-03"},
+		}, false).StatusCode).To(Equal(http.StatusSeeOther))
+		Expect(bob.post(group+"/leave", nil, true).StatusCode).To(Equal(http.StatusNoContent))
+
+		// Without simplification the debts with Bob show up again.
+		resp = alice.post(group+"/settings", url.Values{"name": {"Trip"}, "currency": {"EUR"}}, false)
+		Expect(resp.StatusCode).To(Equal(http.StatusSeeOther))
+		Expect(text(alice.get(group).body)).To(ContainSubstring("bob owes you €10.00"))
+
+		form := alice.get(group + "/settle?from=" + bobU.ID.String() + "&to=" + aliceU.ID.String() + "&amount=10")
+		Expect(form.body).To(MatchRegexp(`<option value="` + bobU.ID.String() + `" selected>bob \(left the group\)</option>`))
+
+		resp = alice.post(group+"/settle", url.Values{
+			"from": {bobU.ID.String()}, "to": {aliceU.ID.String()},
+			"amount": {"10"}, "currency": {"EUR"}, "date": {"2026-11-03"},
+		}, false)
+		Expect(resp.StatusCode).To(Equal(http.StatusSeeOther))
+		Expect(text(alice.get(group).body)).NotTo(ContainSubstring("bob owes you"))
+
+		// Carol still owes Bob, but people outside the group can not be chosen.
+		Expect(text(alice.get(group).body)).To(ContainSubstring("carol owes bob €10.00"))
+		mallory := mustCreateUser(ctx, "mallory@example.com")
+		Expect(alice.post(group+"/settle", url.Values{
+			"from": {mallory.ID.String()}, "to": {aliceU.ID.String()},
+			"amount": {"1"}, "currency": {"EUR"}, "date": {"2026-11-03"},
+		}, false).StatusCode).To(Equal(http.StatusOK))
 	})
 
 	It("does not delete a group with open balances", func() {
@@ -199,9 +246,9 @@ var _ = Describe("groups", func() {
 		Expect(text(body)).To(ContainSubstring("Settle up your balances in this group before leaving it."))
 		Expect(text(body)).To(ContainSubstring("Everyone must be settled up before the group can be deleted."))
 
-		// Bob is not the creator: no delete button or hint.
+		// Bob is not the creator but can delete too once everyone is settled.
 		t := text(bob.get(group + "/settings").body)
-		Expect(t).NotTo(ContainSubstring("Delete group"))
-		Expect(t).NotTo(ContainSubstring("Everyone must be settled up"))
+		Expect(t).To(ContainSubstring("Delete group"))
+		Expect(t).To(ContainSubstring("Everyone must be settled up"))
 	})
 })

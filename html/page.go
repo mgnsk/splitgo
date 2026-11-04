@@ -34,7 +34,7 @@ func Page(props PageProps) Node {
 	return HTML5(HTML5Props{
 		Title:     title,
 		Language:  "en",
-		HTMLAttrs: Group{themeAttr(props.User)},
+		HTMLAttrs: Group{themeAttr(props.User), timezoneAttr(props.User)},
 		Head: []Node{
 			Meta(Name("viewport"), Content("width=device-width, initial-scale=1")),
 			Meta(
@@ -63,6 +63,15 @@ func Page(props PageProps) Node {
 			),
 		},
 	})
+}
+
+// timezoneAttr renders the user's saved time zone so that app.js can
+// update it when the browser's differs.
+func timezoneAttr(user *domain.User) Node {
+	if user == nil {
+		return nil
+	}
+	return Data("timezone", user.Timezone)
 }
 
 func topbar(user *domain.User, path string) Node {

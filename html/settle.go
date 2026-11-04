@@ -2,20 +2,28 @@ package html
 
 import (
 	"net/url"
+	"slices"
 
 	"github.com/mgnsk/splitgo/contract"
+	"github.com/mgnsk/splitgo/domain"
 	"github.com/mgnsk/splitgo/html/components"
 	. "maragu.dev/gomponents"
 	. "maragu.dev/gomponents/html"
 )
 
 // SettleMain renders the record payment page.
-func SettleMain(d GroupData, form contract.SettleForm, errs url.Values) Node {
+// parties are the people who can pay or receive: the members and former
+// members with open debts.
+func SettleMain(d GroupData, parties []*domain.User, form contract.SettleForm, errs url.Values) Node {
 	base := groupURL(d.Group.ID)
 
 	var opts []components.SelectOption
-	for _, m := range d.Members {
-		opts = append(opts, components.SelectOption{Value: m.ID.String(), Label: d.People.Name(m.ID, d.Me.ID)})
+	for _, p := range parties {
+		label := d.People.Name(p.ID, d.Me.ID)
+		if !slices.ContainsFunc(d.Members, func(m *domain.User) bool { return m.ID == p.ID }) {
+			label += " (left the group)"
+		}
+		opts = append(opts, components.SelectOption{Value: p.ID.String(), Label: label})
 	}
 
 	return Div(Class("stack"),

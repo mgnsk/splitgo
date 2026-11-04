@@ -19,7 +19,7 @@ var _ = Describe("theme", func() {
 
 	It("follows the system theme by default", func() {
 		body := c.get("/").body
-		Expect(body).To(ContainSubstring(`<html lang="en">`))
+		Expect(body).To(ContainSubstring(`<html lang="en" data-timezone="">`))
 		Expect(body).To(ContainSubstring(`value="dark"`))
 		Expect(body).To(ContainSubstring(`value="light"`))
 	})
@@ -28,10 +28,10 @@ var _ = Describe("theme", func() {
 		resp := c.post("/theme", url.Values{"theme": {"dark"}, "next": {"/activity"}}, false)
 		Expect(resp.StatusCode).To(Equal(http.StatusSeeOther))
 		Expect(resp.Header.Get("Location")).To(Equal("/activity"))
-		Expect(c.get("/activity").body).To(ContainSubstring(`<html lang="en" data-theme="dark">`))
+		Expect(c.get("/activity").body).To(ContainSubstring(`<html lang="en" data-theme="dark" data-timezone="">`))
 
 		c.post("/theme", url.Values{"theme": {"light"}, "next": {"/"}}, false)
-		Expect(c.get("/").body).To(ContainSubstring(`<html lang="en" data-theme="light">`))
+		Expect(c.get("/").body).To(ContainSubstring(`<html lang="en" data-theme="light" data-timezone="">`))
 	})
 
 	It("does not redirect off-site", func() {
@@ -50,11 +50,42 @@ var _ = Describe("theme", func() {
 
 		resp := c.post("/account", url.Values{"name": {"Alice"}, "currency": {"EUR"}, "theme": {"system"}}, false)
 		Expect(resp.StatusCode).To(Equal(http.StatusSeeOther))
-		Expect(c.get("/").body).To(ContainSubstring(`<html lang="en">`))
+		Expect(c.get("/").body).To(ContainSubstring(`<html lang="en" data-timezone="">`))
 	})
 
 	It("requires login", func() {
 		resp := newTestEnv(false).newClient().post("/theme", url.Values{"theme": {"dark"}}, false)
 		Expect(resp.StatusCode).To(Equal(http.StatusForbidden))
+	})
+})
+
+var _ = Describe("time zone", func() {
+	It("uses the browser's time zone for today's date", func() {
+		env := newTestEnv(false)
+		c := env.newClient()
+		c.login("alice@example.com")
+		group := c.createGroup("Trip")
+
+		// The test clock is 2026-11-03 12:00 UTC.
+		Expect(c.get(group + "/expenses/new").body).To(ContainSubstring(`value="2026-11-03"`))
+
+		resp := c.post("/timezone", url.Values{"timezone": {"Pacific/Kiritimati"}}, false)
+		Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
+		Expect(c.get("/").body).To(ContainSubstring(`data-timezone="Pacific/Kiritimati"`))
+
+		// UTC+14 is already on the next day.
+		Expect(c.get(group + "/expenses/new").body).To(ContainSubstring(`value="2026-11-04"`))
+		Expect(c.get(group + "/settle").body).To(ContainSubstring(`value="2026-11-04"`))
+	})
+
+	It("rejects unknown time zones", func() {
+		env := newTestEnv(false)
+		c := env.newClient()
+		c.login("alice@example.com")
+
+		for _, tz := range []string{"", "Local", "Mars/Olympus", "../../etc/passwd"} {
+			Expect(c.post("/timezone", url.Values{"timezone": {tz}}, false).StatusCode).To(Equal(http.StatusBadRequest), tz)
+		}
+		Expect(env.newClient().post("/timezone", url.Values{"timezone": {"UTC"}}, false).StatusCode).NotTo(Equal(http.StatusNoContent))
 	})
 })

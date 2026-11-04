@@ -1,6 +1,7 @@
 package handler_test
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -215,5 +216,42 @@ var _ = Describe("friends", func() {
 
 		Expect(text(alice.get("/activity").body)).To(ContainSubstring("Lunch bob · You paid €20.00"))
 		Expect(text(bob.get("/activity").body)).To(ContainSubstring("Lunch alice · alice paid €20.00"))
+	})
+})
+
+var _ = Describe("invite limit", func() {
+	It("limits invite emails per day across friends and groups", func(ctx SpecContext) {
+		env := newTestEnv(false)
+		alice := env.newClient()
+		alice.login("alice@example.com")
+		group := alice.createGroup("Trip")
+
+		for i := range model.MaxInvites {
+			email := fmt.Sprintf("friend%d@example.com", i)
+			if i%2 == 0 {
+				Expect(alice.post("/friends", url.Values{"email": {email}}, false).StatusCode).To(Equal(http.StatusSeeOther))
+			} else {
+				Expect(alice.post(group+"/members", url.Values{"email": {email}}, false).StatusCode).To(Equal(http.StatusSeeOther))
+			}
+		}
+		sent := len(env.mailer.messages())
+
+		resp := alice.post("/friends", url.Values{"email": {"extra@example.com"}}, false)
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		Expect(text(resp.body)).To(ContainSubstring("You can send up to 20 invites a day."))
+
+		resp = alice.post(group+"/members", url.Values{"email": {"extra@example.com"}}, false)
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		Expect(text(resp.body)).To(ContainSubstring("You can send up to 20 invites a day."))
+
+		Expect(env.mailer.messages()).To(HaveLen(sent))
+		_, err := model.GetUserByEmail(ctx, db, "extra@example.com")
+		Expect(err).To(HaveOccurred(), "no account is created when refused")
+
+		// Existing friends still open without sending anything.
+		Expect(alice.post("/friends", url.Values{"email": {"friend0@example.com"}}, false).StatusCode).To(Equal(http.StatusSeeOther))
+
+		env.clock.Advance(model.InviteWindow)
+		Expect(alice.post("/friends", url.Values{"email": {"extra@example.com"}}, false).StatusCode).To(Equal(http.StatusSeeOther))
 	})
 })

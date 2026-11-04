@@ -229,10 +229,6 @@ func (d GroupSettingsData) canLeave() bool {
 	return d.Settled && len(d.Members) > 1
 }
 
-func (d GroupSettingsData) isCreator() bool {
-	return d.Group.CreatedBy == d.Me.ID
-}
-
 // leaveDeleteHints explains why leaving or deleting is not possible yet.
 func (d GroupSettingsData) leaveDeleteHints() []string {
 	var hints []string
@@ -242,7 +238,7 @@ func (d GroupSettingsData) leaveDeleteHints() []string {
 	case !d.Settled:
 		hints = append(hints, "Settle up your balances in this group before leaving it.")
 	}
-	if d.isCreator() && !d.AllSettled {
+	if !d.AllSettled {
 		hints = append(hints, "Everyone must be settled up before the group can be deleted.")
 	}
 	return hints
@@ -314,10 +310,8 @@ func GroupSettingsMain(d GroupSettingsData) Node {
 			Div(Class("row wrap"),
 				Button(Type("button"), Class("btn btn-danger"), If(!d.canLeave(), Disabled()),
 					hx.Post(base+"/leave"), hx.Confirm("Leave this group?"), Text("Leave group")),
-				If(d.isCreator(),
-					Button(Type("button"), Class("btn btn-danger"), If(!d.AllSettled, Disabled()),
-						hx.Post(base+"/delete"), hx.Confirm("Delete this group and all its expenses?"), Text("Delete group")),
-				),
+				Button(Type("button"), Class("btn btn-danger"), If(!d.AllSettled, Disabled()),
+					hx.Post(base+"/delete"), hx.Confirm("Delete this group and all its expenses for everyone?"), Text("Delete group")),
 			),
 			Map(d.leaveDeleteHints(), func(hint string) Node {
 				return P(Class("hint"), Text(hint))

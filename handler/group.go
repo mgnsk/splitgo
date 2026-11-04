@@ -245,6 +245,16 @@ func (h *GroupHandler) AddMember(w http.ResponseWriter, r *http.Request) {
 
 	email := domain.NormalizeEmail(req.Email)
 
+	if slices.ContainsFunc(d.Members, func(m *domain.User) bool { return domain.NormalizeEmail(m.Email) == email }) {
+		h.renderSettings(w, r, d, groupForm(d.Group), nil, req.Email, url.Values{"email": {"Already a member"}})
+		return
+	}
+
+	if !h.canInvite(ctx, me) {
+		h.renderSettings(w, r, d, groupForm(d.Group), nil, req.Email, url.Values{"email": {inviteLimitMessage}})
+		return
+	}
+
 	user, err := model.GetUserByEmail(ctx, h.DB, email)
 	if errors.Is(err, splitgo.NotFound) {
 		user = &domain.User{ID: snowflake.Generate(), Email: email, Currency: d.Group.Currency}
@@ -252,11 +262,6 @@ func (h *GroupHandler) AddMember(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		panic(err)
-	}
-
-	if slices.ContainsFunc(d.Members, func(m *domain.User) bool { return m.ID == user.ID }) {
-		h.renderSettings(w, r, d, groupForm(d.Group), nil, req.Email, url.Values{"email": {"Already a member"}})
-		return
 	}
 
 	if err := model.AddGroupMember(ctx, h.DB, d.Group.ID, user.ID); err != nil {
@@ -278,6 +283,7 @@ func (h *GroupHandler) AddMember(w http.ResponseWriter, r *http.Request) {
 	}); err != nil {
 		panic(err)
 	}
+	h.recordInvite(ctx, me)
 
 	h.Push.Notify(ctx, []snowflake.ID{user.ID}, push.Message{
 		Title: d.Group.Name,
@@ -316,16 +322,13 @@ func (h *GroupHandler) Leave(w http.ResponseWriter, r *http.Request) {
 	server.Redirect(w, r, "/")
 }
 
-// Delete deletes the group. Only the creator can delete a settled group.
+// Delete deletes the group once everyone is settled up. Any member can do
+// it, so a group never gets stuck after its creator leaves.
 func (h *GroupHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
 	req := decode[contract.GroupPath](r)
 	d := h.loadOrdinaryGroup(ctx, me, req.GroupID)
-
-	if d.Group.CreatedBy != me.ID {
-		panic(splitgo.Forbidden.New("Only the creator can delete the group"))
-	}
 
 	if _, all := h.settledState(ctx, d); !all {
 		panic(splitgo.PreconditionFailed.New("Everyone must be settled up before deleting the group"))

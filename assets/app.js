@@ -332,3 +332,29 @@ window.addEventListener("pageshow", (event) => {
   }
 });
 document.addEventListener("DOMContentLoaded", connectLive);
+
+// Save the browser's time zone so that dates like "today" for new expenses
+// follow the user's local day.
+function syncTimezone() {
+  const saved = document.documentElement.dataset.timezone;
+  if (saved === undefined) {
+    return; // Not signed in.
+  }
+  let tz = "";
+  try {
+    tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  } catch {
+    return;
+  }
+  if (!tz || tz === saved) {
+    return;
+  }
+  fetch("/timezone", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ timezone: tz }),
+  }).catch(() => {});
+}
+
+document.addEventListener("DOMContentLoaded", syncTimezone);

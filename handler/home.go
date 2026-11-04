@@ -31,6 +31,7 @@ func (h *HomeHandler) Register(mux *http.ServeMux) {
 	h.handle(mux, "GET /account", h.Account, true)
 	h.handle(mux, "POST /account", h.Account, true)
 	h.handle(mux, "POST /theme", h.SetTheme, true)
+	h.handle(mux, "POST /timezone", h.SetTimezone, true)
 }
 
 // Home renders the overview of balances, friends and groups.
@@ -163,6 +164,25 @@ func (h *HomeHandler) Account(w http.ResponseWriter, r *http.Request) {
 
 	server.Flash(r, h.SM, "Account saved")
 	http.Redirect(w, r, "/account", http.StatusSeeOther)
+}
+
+// SetTimezone saves the time zone detected by the browser. Dates such as
+// "today" for new expenses follow it.
+func (h *HomeHandler) SetTimezone(w http.ResponseWriter, r *http.Request) {
+	me := mustUser(r)
+	tz := r.PostFormValue("timezone")
+
+	if !domain.ValidTimezone(tz) {
+		panic(splitgo.InvalidValue.New("Unknown time zone"))
+	}
+
+	if tz != me.Timezone {
+		if err := model.SetUserTimezone(r.Context(), h.DB, me.ID, tz); err != nil {
+			panic(err)
+		}
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // SetTheme saves the color theme chosen with the top menu toggle and returns

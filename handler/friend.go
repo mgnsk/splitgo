@@ -61,13 +61,32 @@ func (h *FriendHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	friend, err := model.GetUserByEmail(ctx, h.DB, email)
-	if errors.Is(err, splitgo.NotFound) {
-		friend = &domain.User{ID: snowflake.Generate(), Email: email, Currency: me.Currency}
-		err = model.InsertUser(ctx, h.DB, friend)
+	alreadyFriends := func(friend *domain.User) {
+		server.Flash(r, h.SM, fmt.Sprintf("%s is already your friend", friend.DisplayName()))
+		http.Redirect(w, r, html.FriendURL(friend.ID), http.StatusSeeOther)
 	}
-	if err != nil {
+
+	friend, err := model.GetUserByEmail(ctx, h.DB, email)
+	switch {
+	case err == nil:
+		if h.directGroup(ctx, me.ID, friend.ID) != nil {
+			alreadyFriends(friend)
+			return
+		}
+	case !errors.Is(err, splitgo.NotFound):
 		panic(err)
+	}
+
+	if !h.canInvite(ctx, me) {
+		server.RenderPage(w, r, h.SM, "Add friend", html.AddFriendMain(req.Email, url.Values{"email": {inviteLimitMessage}}))
+		return
+	}
+
+	if friend == nil {
+		friend = &domain.User{ID: snowflake.Generate(), Email: email, Currency: me.Currency}
+		if err := model.InsertUser(ctx, h.DB, friend); err != nil {
+			panic(err)
+		}
 	}
 
 	group, created, err := model.GetOrCreateDirectGroup(ctx, h.DB, me.ID, friend.ID, me.Currency)
@@ -76,8 +95,7 @@ func (h *FriendHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !created {
-		server.Flash(r, h.SM, fmt.Sprintf("%s is already your friend", friend.DisplayName()))
-		http.Redirect(w, r, html.FriendURL(friend.ID), http.StatusSeeOther)
+		alreadyFriends(friend)
 		return
 	}
 
@@ -96,6 +114,7 @@ func (h *FriendHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}); err != nil {
 		panic(err)
 	}
+	h.recordInvite(ctx, me)
 
 	h.Push.Notify(ctx, []snowflake.ID{friend.ID}, push.Message{
 		Title: "splitgo",
@@ -236,6 +255,25 @@ func (h *FriendHandler) ChooseLedger(w http.ResponseWriter, r *http.Request) {
 	}
 
 	server.RenderPage(w, r, h.SM, "Add expense", html.ChooseLedgerMain(friendItems(friends, nil), ordinaryGroups(groups)))
+}
+
+// inviteLimitMessage tells the user they sent too many invite emails.
+var inviteLimitMessage = fmt.Sprintf("You can send up to %d invites a day. Try again later.", model.MaxInvites)
+
+// canInvite reports whether the user may send another invite email.
+func (d *Deps) canInvite(ctx context.Context, me *domain.User) bool {
+	ok, err := model.CanInvite(ctx, d.DB, me.ID, d.now())
+	if err != nil {
+		panic(err)
+	}
+	return ok
+}
+
+// recordInvite counts an invite email sent by the user.
+func (d *Deps) recordInvite(ctx context.Context, me *domain.User) {
+	if err := model.InsertInvite(ctx, d.DB, me.ID, d.now()); err != nil {
+		panic(err)
+	}
 }
 
 // directGroup returns the direct group of two users, or nil if they are
