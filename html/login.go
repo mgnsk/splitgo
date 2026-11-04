@@ -43,6 +43,7 @@ func CheckEmailMain(email, next string, errs url.Values) Node {
 		Form(Class("card stack"), Method("post"), Action("/login/code"),
 			Input(Type("hidden"), Name("email"), Value(email)),
 			Input(Type("hidden"), Name("next"), Value(next)),
+			timezoneInput(),
 			components.Field(components.FieldProps{
 				Label:       "Sign-in code",
 				Name:        "code",
@@ -72,8 +73,15 @@ func ConfirmLoginMain(action, email string) Node {
 			H1(Text("Sign in")),
 			P(Text("Continue as "), Strong(Text(email)), Text("?")),
 		),
+		timezoneInput(),
 		components.SubmitButton("Continue", true),
 	)
+}
+
+// timezoneInput is filled in by app.js with the browser's time zone, which
+// is saved on the user when signing in.
+func timezoneInput() Node {
+	return Input(Type("hidden"), Name("timezone"), Value(""))
 }
 
 // InvalidLinkMain renders the page for an invalid or expired sign-in link.

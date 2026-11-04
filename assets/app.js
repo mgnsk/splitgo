@@ -357,4 +357,20 @@ function syncTimezone() {
   }).catch(() => {});
 }
 
-document.addEventListener("DOMContentLoaded", syncTimezone);
+// Sign-in forms send the time zone so it is saved when signing in.
+function fillTimezoneInputs() {
+  let tz = "";
+  try {
+    tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  } catch {
+    return;
+  }
+  for (const input of document.querySelectorAll('input[name="timezone"]')) {
+    input.value = tz;
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  fillTimezoneInputs();
+  syncTimezone();
+});

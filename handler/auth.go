@@ -297,6 +297,14 @@ func (h *AuthHandler) signIn(w http.ResponseWriter, r *http.Request, email, next
 		}
 	}
 
+	// The sign-in forms carry the browser's time zone, so dates are local
+	// from the first page.
+	if tz := r.PostFormValue("timezone"); tz != user.Timezone && domain.ValidTimezone(tz) {
+		if err := model.SetUserTimezone(ctx, h.DB, user.ID, tz); err != nil {
+			panic(err)
+		}
+	}
+
 	// First renew the session token.
 	if err := h.SM.RenewToken(ctx); err != nil {
 		panic(err)

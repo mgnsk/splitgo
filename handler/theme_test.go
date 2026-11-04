@@ -1,9 +1,11 @@
 package handler_test
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 
+	"github.com/mgnsk/splitgo/model"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -87,5 +89,53 @@ var _ = Describe("time zone", func() {
 			Expect(c.post("/timezone", url.Values{"timezone": {tz}}, false).StatusCode).To(Equal(http.StatusBadRequest), tz)
 		}
 		Expect(env.newClient().post("/timezone", url.Values{"timezone": {"UTC"}}, false).StatusCode).NotTo(Equal(http.StatusNoContent))
+	})
+})
+
+var _ = Describe("time zone on sign-in", func() {
+	var env *testEnv
+
+	BeforeEach(func(ctx SpecContext) {
+		env = newTestEnv(false)
+		mustCreateUser(ctx, "alice@example.com")
+	})
+
+	timezone := func(ctx context.Context) string {
+		GinkgoHelper()
+		u, err := model.GetUserByEmail(ctx, db, "alice@example.com")
+		Expect(err).NotTo(HaveOccurred())
+		return u.Timezone
+	}
+
+	It("is sent with the sign-in code", func(ctx SpecContext) {
+		c := env.newClient()
+		resp := c.post("/login", url.Values{"email": {"alice@example.com"}}, false)
+		Expect(resp.body).To(ContainSubstring(`<input type="hidden" name="timezone" value="">`))
+
+		resp = c.post("/login/code", url.Values{
+			"email": {"alice@example.com"}, "code": {env.mailer.lastCodeTo("alice@example.com")},
+			"timezone": {"Asia/Tokyo"},
+		}, false)
+		Expect(resp.StatusCode).To(Equal(http.StatusSeeOther))
+		Expect(timezone(ctx)).To(Equal("Asia/Tokyo"))
+	})
+
+	It("is sent when confirming the sign-in link", func(ctx SpecContext) {
+		c := env.newClient()
+		c.post("/login", url.Values{"email": {"alice@example.com"}}, false)
+		link := env.mailer.lastLinkTo("alice@example.com")
+		Expect(c.get(link).body).To(ContainSubstring(`name="timezone"`))
+
+		resp := c.post(link, url.Values{"timezone": {"America/New_York"}}, false)
+		Expect(resp.StatusCode).To(Equal(http.StatusSeeOther))
+		Expect(timezone(ctx)).To(Equal("America/New_York"))
+	})
+
+	It("ignores a missing or unknown time zone", func(ctx SpecContext) {
+		c := env.newClient()
+		c.post("/login", url.Values{"email": {"alice@example.com"}}, false)
+		resp := c.post(env.mailer.lastLinkTo("alice@example.com"), url.Values{"timezone": {"Mars/Olympus"}}, false)
+		Expect(resp.StatusCode).To(Equal(http.StatusSeeOther))
+		Expect(timezone(ctx)).To(BeEmpty())
 	})
 })
