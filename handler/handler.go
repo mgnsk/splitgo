@@ -116,6 +116,17 @@ func (d *Deps) loadGroup(ctx context.Context, me *domain.User, groupID snowflake
 	return html.GroupData{Me: me, Group: group, Members: members, People: people}
 }
 
+// loadOrdinaryGroup loads a group like loadGroup, rejecting the hidden
+// groups holding non-group expenses with a friend: they have no settings
+// or membership of their own.
+func (d *Deps) loadOrdinaryGroup(ctx context.Context, me *domain.User, groupID snowflake.ID) html.GroupData {
+	data := d.loadGroup(ctx, me, groupID)
+	if data.Group.Direct() {
+		panic(splitgo.NotFound.New("Group not found"))
+	}
+	return data
+}
+
 // addPeople loads users referenced by ids that are not yet in people.
 func (d *Deps) addPeople(ctx context.Context, people html.People, ids []snowflake.ID) {
 	var missing []snowflake.ID
@@ -197,5 +208,6 @@ func New(deps *Deps) http.Handler {
 		NewSettleHandler(deps).Register,
 		NewPushHandler(deps).Register,
 		NewEventsHandler(deps).Register,
+		NewFriendHandler(deps).Register,
 	)
 }

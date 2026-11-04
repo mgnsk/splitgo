@@ -14,17 +14,19 @@ type GroupSummary struct {
 
 // HomeData is the data for the home page.
 type HomeData struct {
-	Me       *domain.User
-	Owed     map[string]int64
-	Owes     map[string]int64
-	Balances []domain.Balance
-	Groups   []GroupSummary
-	People   People
+	Me      *domain.User
+	Owed    map[string]int64
+	Owes    map[string]int64
+	Friends []FriendItem
+	// Others are balances with people who are not friends, from groups.
+	Others []domain.Balance
+	Groups []GroupSummary
+	People People
 }
 
 // HomeMain renders the home page.
 func HomeMain(d HomeData) Node {
-	sortBalances(d.Balances, d.People)
+	sortBalances(d.Others, d.People)
 
 	return Div(Class("stack"),
 		Div(Class("page-head"),
@@ -32,37 +34,54 @@ func HomeMain(d HomeData) Node {
 				H1(Textf("Hi, %s", d.Me.DisplayName())),
 				P(Class("sub"), Text("Here's where you stand.")),
 			),
-			A(Class("btn btn-primary"), Href("/groups/new"), Text("New group")),
+			A(Class("btn btn-primary"), Href("/expenses/new"), Text("Add expense")),
 		),
 
 		Div(Class("summary"),
 			summaryCard("You are owed", d.Owed, true),
 			summaryCard("You owe", d.Owes, false),
 		),
+		If(len(d.Owed) == 0 && len(d.Owes) == 0, P(Class("hint"), Text("You're all settled up."))),
 
-		H2(Class("section-title"), Text("Balances")),
+		H2(Class("section-title"), Text("Friends")),
 		Div(Class("card card-flush"),
 			Ul(Class("list"),
-				If(len(d.Balances) == 0, emptyItem("You're all settled up.")),
-				Map(d.Balances, func(b domain.Balance) Node {
-					return Li(A(Class("list-item"), Href("/activity?with="+b.UserID.String()),
-						Avatar(d.People.name(b.UserID)),
+				Map(d.Friends, func(f FriendItem) Node {
+					return Li(A(Class("list-item"), Href(FriendURL(f.User.ID)),
+						Avatar(f.User.DisplayName()),
 						Div(Class("grow"),
-							Div(Class("title"), Text(d.People.name(b.UserID))),
-							Div(Class("muted small"), balanceSentence(b)),
+							Div(Class("title"), Text(f.User.DisplayName())),
+							Div(Class("muted small"), netSummary(f.Net)),
 						),
-						Amount(b.Amount, b.Currency),
 					))
 				}),
+				Li(A(Class("list-item"), Href("/friends/new"),
+					Div(Class("grow title"), Text("+ Add friend")),
+				)),
 			),
 		),
+
+		If(len(d.Others) > 0, Group{
+			H2(Class("section-title"), Text("Other balances")),
+			Div(Class("card card-flush"),
+				Ul(Class("list"),
+					Map(d.Others, func(b domain.Balance) Node {
+						return Li(A(Class("list-item"), Href(FriendURL(b.UserID)),
+							Avatar(d.People.name(b.UserID)),
+							Div(Class("grow"),
+								Div(Class("title"), Text(d.People.name(b.UserID))),
+								Div(Class("muted small"), balanceSentence(b)),
+							),
+							Amount(b.Amount, b.Currency),
+						))
+					}),
+				),
+			),
+		}),
 
 		H2(Class("section-title"), Text("Groups")),
 		Div(Class("card card-flush"),
 			Ul(Class("list"),
-				If(len(d.Groups) == 0, Li(Div(Class("list-empty"),
-					Text("No groups yet. "), A(Href("/groups/new"), Text("Create one")), Text(" to start splitting."),
-				))),
 				Map(d.Groups, func(g GroupSummary) Node {
 					return Li(A(Class("list-item"), Href(groupURL(g.Group.ID)),
 						Avatar(g.Group.Name),
@@ -72,6 +91,9 @@ func HomeMain(d HomeData) Node {
 						),
 					))
 				}),
+				Li(A(Class("list-item"), Href("/groups/new"),
+					Div(Class("grow title"), Text("+ New group")),
+				)),
 			),
 		),
 	)

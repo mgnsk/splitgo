@@ -13,3 +13,11 @@ func Must[V any](v V, err error) V {
 
 	return v
 }
+
+// Must2 is Must for functions returning two values and an error.
+func Must2[V, W any](v V, w W, err error) (V, W) {
+	GinkgoHelper()
+	Expect(err).NotTo(HaveOccurred())
+
+	return v, w
+}

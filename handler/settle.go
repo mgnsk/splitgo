@@ -103,5 +103,5 @@ func (h *SettleHandler) Settle(w http.ResponseWriter, r *http.Request) {
 	h.publishGroup(d.Group.ID, d.Members)
 
 	server.Flash(r, h.SM, "Payment recorded")
-	http.Redirect(w, r, groupPath(d.Group.ID), http.StatusSeeOther)
+	http.Redirect(w, r, d.LedgerURL(), http.StatusSeeOther)
 }

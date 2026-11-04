@@ -2,7 +2,11 @@ package model
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"errors"
 
+	"github.com/mgnsk/splitgo"
 	"github.com/mgnsk/splitgo/domain"
 	"github.com/mgnsk/splitgo/pkg/snowflake"
 	"github.com/mgnsk/splitgo/pkg/sqlite"
@@ -13,6 +17,8 @@ import (
 // Group is the group database model.
 type Group struct {
 	ID            snowflake.ID `bun:"id,pk"`
+	Kind          string       `bun:"kind"`
+	DirectKey     *string      `bun:"direct_key"`
 	Name          string       `bun:"name"`
 	Currency      string       `bun:"currency"`
 	SimplifyDebts bool         `bun:"simplify_debts"`
@@ -32,6 +38,9 @@ type GroupMember struct {
 
 // InsertGroup inserts a group and adds its creator as a member.
 func InsertGroup(ctx context.Context, db bun.IDB, group *domain.Group) error {
+	if group.Kind == "" {
+		group.Kind = domain.GroupKindGroup
+	}
 	return db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := sqlite.WithErrorChecking(tx.NewInsert().Model(groupFromDomain(group)).Exec(ctx)); err != nil {
 			return err
@@ -65,7 +74,10 @@ func GetGroup(ctx context.Context, db bun.IDB, id snowflake.ID) (*domain.Group, 
 // GetGroupByInviteCode returns a group by its invite code.
 func GetGroupByInviteCode(ctx context.Context, db bun.IDB, code string) (*domain.Group, error) {
 	m := &Group{}
-	if err := db.NewSelect().Model(m).Where("invite_code = ?", code).Scan(ctx); err != nil {
+	if err := db.NewSelect().Model(m).
+		Where("invite_code = ?", code).
+		Where("kind = ?", domain.GroupKindGroup).
+		Scan(ctx); err != nil {
 		return nil, sqlite.NormalizeError(err)
 	}
 	return groupToDomain(m), nil
@@ -133,6 +145,101 @@ func IsGroupMember(ctx context.Context, db bun.IDB, groupID, userID snowflake.ID
 	return ok, sqlite.NormalizeError(err)
 }
 
+// Friend is a friend of a user with their shared direct group.
+type Friend struct {
+	User          *domain.User
+	DirectGroupID snowflake.ID
+}
+
+func directKey(a, b snowflake.ID) string {
+	if a > b {
+		a, b = b, a
+	}
+	return a.String() + ":" + b.String()
+}
+
+// GetDirectGroup returns the direct group of two users.
+func GetDirectGroup(ctx context.Context, db bun.IDB, a, b snowflake.ID) (*domain.Group, error) {
+	m := &Group{}
+	if err := db.NewSelect().Model(m).Where("direct_key = ?", directKey(a, b)).Scan(ctx); err != nil {
+		return nil, sqlite.NormalizeError(err)
+	}
+	return groupToDomain(m), nil
+}
+
+// GetOrCreateDirectGroup returns the direct group of two users, creating it
+// with both as members. created reports whether it was created.
+func GetOrCreateDirectGroup(ctx context.Context, db bun.IDB, a, b snowflake.ID, currency string) (group *domain.Group, created bool, err error) {
+	if a == b {
+		return nil, false, splitgo.InvalidValue.New("Can not be friends with yourself")
+	}
+
+	err = db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		group, err = GetDirectGroup(ctx, tx, a, b)
+		if err == nil || !errors.Is(err, splitgo.NotFound) {
+			return err
+		}
+
+		key := directKey(a, b)
+		m := &Group{
+			ID:         snowflake.Generate(),
+			Kind:       string(domain.GroupKindDirect),
+			DirectKey:  &key,
+			Currency:   currency,
+			InviteCode: randomCode(),
+			CreatedBy:  a,
+		}
+		if err := sqlite.WithErrorChecking(tx.NewInsert().Model(m).Exec(ctx)); err != nil {
+			return err
+		}
+		for _, id := range []snowflake.ID{a, b} {
+			if err := AddGroupMember(ctx, tx, m.ID, id); err != nil {
+				return err
+			}
+		}
+
+		group, created = groupToDomain(m), true
+		return nil
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	return group, created, nil
+}
+
+// ListFriends lists the user's friends by name.
+func ListFriends(ctx context.Context, db bun.IDB, userID snowflake.ID) ([]Friend, error) {
+	var rows []struct {
+		User
+		GroupID snowflake.ID `bun:"group_id"`
+	}
+	if err := db.NewSelect().
+		TableExpr("groups AS g").
+		Join("JOIN group_members AS mine ON mine.group_id = g.id AND mine.user_id = ?", userID).
+		Join("JOIN group_members AS theirs ON theirs.group_id = g.id AND theirs.user_id <> ?", userID).
+		Join("JOIN users AS u ON u.id = theirs.user_id").
+		ColumnExpr("u.*, g.id AS group_id").
+		Where("g.kind = ?", domain.GroupKindDirect).
+		OrderExpr("CASE WHEN u.name = '' THEN u.email ELSE u.name END COLLATE NOCASE ASC, u.id ASC").
+		Scan(ctx, &rows); err != nil {
+		return nil, sqlite.NormalizeError(err)
+	}
+
+	friends := make([]Friend, len(rows))
+	for i, r := range rows {
+		friends[i] = Friend{User: userToDomain(&r.User), DirectGroupID: r.GroupID}
+	}
+	return friends, nil
+}
+
+func randomCode() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		panic(err)
+	}
+	return base64.RawURLEncoding.EncodeToString(b)
+}
+
 // SharesGroup reports whether two users are members of a common group.
 func SharesGroup(ctx context.Context, db bun.IDB, a, b snowflake.ID) (bool, error) {
 	ok, err := db.NewSelect().Model((*GroupMember)(nil)).
@@ -143,8 +250,13 @@ func SharesGroup(ctx context.Context, db bun.IDB, a, b snowflake.ID) (bool, erro
 }
 
 func groupFromDomain(g *domain.Group) *Group {
+	kind := g.Kind
+	if kind == "" {
+		kind = domain.GroupKindGroup
+	}
 	return &Group{
 		ID:            g.ID,
+		Kind:          string(kind),
 		Name:          g.Name,
 		Currency:      g.Currency,
 		SimplifyDebts: g.SimplifyDebts,
@@ -156,6 +268,7 @@ func groupFromDomain(g *domain.Group) *Group {
 func groupToDomain(m *Group) *domain.Group {
 	return &domain.Group{
 		ID:            m.ID,
+		Kind:          domain.GroupKind(m.Kind),
 		Name:          m.Name,
 		Currency:      m.Currency,
 		SimplifyDebts: m.SimplifyDebts,

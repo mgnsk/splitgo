@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"strings"
 
 	"github.com/mgnsk/splitgo/domain"
 	"github.com/mgnsk/splitgo/model"
@@ -288,39 +287,6 @@ var _ = Describe("expenses", func() {
 		Expect(t).To(ContainSubstring("Solo Trip · You paid €5.00"))
 
 		Expect(text(bob.get("/activity").body)).NotTo(ContainSubstring("Solo"))
-	})
-
-	It("shows activity with a friend from the home page", func(ctx SpecContext) {
-		addCarol(ctx)
-		alice.addExpense(group, url.Values{"description": {"Groceries"}, "amount": {"10"}, "mode": {"advanced"}, "split_type": {"equal"},
-			"paid_by": {aliceU.ID.String()}, "included": {aliceU.ID.String(), bobU.ID.String()}})
-		alice.addExpense(group, url.Values{"description": {"Taxi"}, "amount": {"8"}, "mode": {"advanced"}, "split_type": {"equal"},
-			"paid_by": {aliceU.ID.String()}, "included": {aliceU.ID.String(), carol.ID.String()}})
-
-		withBob := "/activity?with=" + bobU.ID.String()
-		Expect(alice.get("/").body).To(ContainSubstring(`href="` + strings.ReplaceAll(withBob, "&", "&amp;") + `"`))
-
-		t := text(alice.get(withBob).body)
-		Expect(t).To(ContainSubstring("bob owes you €5.00"))
-		Expect(t).To(ContainSubstring("Groceries"))
-		Expect(t).NotTo(ContainSubstring("Taxi"))
-		Expect(t).To(ContainSubstring("All activity"))
-
-		// Bob sees the same expenses from his side.
-		t = text(bob.get("/activity?with=" + aliceU.ID.String()).body)
-		Expect(t).To(ContainSubstring("You owe alice €5.00"))
-		Expect(t).To(ContainSubstring("Groceries"))
-	})
-
-	It("shows a settled friend and hides strangers", func(ctx SpecContext) {
-		t := text(alice.get("/activity?with=" + bobU.ID.String()).body)
-		Expect(t).To(ContainSubstring("You're settled up."))
-		Expect(t).To(ContainSubstring("Nothing here yet."))
-
-		stranger := mustCreateUser(ctx, "mallory@example.com")
-		for _, q := range []string{stranger.ID.String(), aliceU.ID.String(), "0", "abc"} {
-			Expect(alice.get("/activity?with=" + q).StatusCode).To(Equal(http.StatusNotFound), q)
-		}
 	})
 
 	It("paginates the expense list", func(ctx SpecContext) {

@@ -345,3 +345,43 @@ func JoinMain(group *domain.Group, memberCount int, code string) Node {
 		components.SubmitButton("Join group", true),
 	)
 }
+
+// FriendURL returns the page of a friend.
+func FriendURL(id snowflake.ID) string {
+	return "/friends/" + id.String()
+}
+
+// Friend returns the other member of a direct group, or nil.
+func (d GroupData) Friend() *domain.User {
+	if !d.Group.Direct() {
+		return nil
+	}
+	for _, m := range d.Members {
+		if m.ID != d.Me.ID {
+			return m
+		}
+	}
+	return nil
+}
+
+// LedgerURL returns the page of the group, or of the friend for the
+// non-group expenses with a friend.
+func (d GroupData) LedgerURL() string {
+	if f := d.Friend(); f != nil {
+		return FriendURL(f.ID)
+	}
+	return groupURL(d.Group.ID)
+}
+
+// LedgerName returns the group name, or the friend's name for the non-group
+// expenses with a friend.
+func (d GroupData) LedgerName() string {
+	if f := d.Friend(); f != nil {
+		return f.DisplayName()
+	}
+	return d.Group.Name
+}
+
+func ledgerLink(d GroupData) Node {
+	return A(Href(d.LedgerURL()), Text(d.LedgerName()))
+}

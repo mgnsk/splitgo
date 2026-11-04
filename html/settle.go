@@ -22,7 +22,7 @@ func SettleMain(d GroupData, form contract.SettleForm, errs url.Values) Node {
 		Div(Class("page-head"),
 			Div(
 				H1(Text("Record a payment")),
-				P(Class("sub"), A(Href(base), Text(d.Group.Name))),
+				P(Class("sub"), ledgerLink(d)),
 			),
 		),
 		Form(Class("card stack"), Method("post"), Action(base+"/settle"),
@@ -51,7 +51,7 @@ func SettleMain(d GroupData, form contract.SettleForm, errs url.Values) Node {
 			P(Class("hint"), Text("Record money paid outside splitgo, e.g. a bank transfer or cash.")),
 			Div(Class("row"),
 				components.SubmitButton("Record payment", false),
-				A(Class("btn"), Href(base), Text("Cancel")),
+				A(Class("btn"), Href(d.LedgerURL()), Text("Cancel")),
 			),
 		),
 	)

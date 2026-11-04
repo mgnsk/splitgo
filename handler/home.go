@@ -33,12 +33,17 @@ func (h *HomeHandler) Register(mux *http.ServeMux) {
 	h.handle(mux, "POST /theme", h.SetTheme, true)
 }
 
-// Home renders the overview of balances and groups.
+// Home renders the overview of balances, friends and groups.
 func (h *HomeHandler) Home(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
 
 	groups, err := model.ListUserGroups(ctx, h.DB, me.ID)
+	if err != nil {
+		panic(err)
+	}
+
+	friends, err := model.ListFriends(ctx, h.DB, me.ID)
 	if err != nil {
 		panic(err)
 	}
@@ -51,42 +56,66 @@ func (h *HomeHandler) Home(w http.ResponseWriter, r *http.Request) {
 	balances := domain.Balances(me.ID, debts)
 	owed, owes := domain.Totals(balances)
 
-	nets := map[snowflake.ID]map[string]int64{}
-	for _, d := range debts {
-		if nets[d.GroupID] == nil {
-			nets[d.GroupID] = map[string]int64{}
-		}
-		if d.To == me.ID {
-			nets[d.GroupID][d.Currency] += d.Amount
+	// Net per friend over all groups and non-group expenses.
+	friendNets := map[snowflake.ID]map[string]int64{}
+	for _, f := range friends {
+		friendNets[f.User.ID] = map[string]int64{}
+	}
+	var others []domain.Balance
+	for _, b := range balances {
+		if net, ok := friendNets[b.UserID]; ok {
+			net[b.Currency] += b.Amount
 		} else {
-			nets[d.GroupID][d.Currency] -= d.Amount
+			others = append(others, b)
 		}
 	}
 
-	summaries := make([]html.GroupSummary, len(groups))
-	for i, g := range groups {
-		summaries[i] = html.GroupSummary{Group: g, Net: nets[g.ID]}
+	// Net per ordinary group.
+	groupNets := map[snowflake.ID]map[string]int64{}
+	for _, d := range debts {
+		if groupNets[d.GroupID] == nil {
+			groupNets[d.GroupID] = map[string]int64{}
+		}
+		if d.To == me.ID {
+			groupNets[d.GroupID][d.Currency] += d.Amount
+		} else {
+			groupNets[d.GroupID][d.Currency] -= d.Amount
+		}
+	}
+
+	var summaries []html.GroupSummary
+	for _, g := range ordinaryGroups(groups) {
+		summaries = append(summaries, html.GroupSummary{Group: g, Net: groupNets[g.ID]})
 	}
 
 	people := html.People{me.ID: me}
 	var ids []snowflake.ID
-	for _, b := range balances {
+	for _, b := range others {
 		ids = append(ids, b.UserID)
 	}
 	h.addPeople(ctx, people, ids)
 
 	server.RenderPage(w, r, h.SM, "Home", html.HomeMain(html.HomeData{
-		Me:       me,
-		Owed:     owed,
-		Owes:     owes,
-		Balances: balances,
-		Groups:   summaries,
-		People:   people,
+		Me:      me,
+		Owed:    owed,
+		Owes:    owes,
+		Friends: friendItems(friends, friendNets),
+		Others:  others,
+		Groups:  summaries,
+		People:  people,
 	}))
 }
 
-// Activity renders recent expenses across all of the user's groups, or
-// those shared with one friend when the with query parameter is set.
+func friendItems(friends []model.Friend, nets map[snowflake.ID]map[string]int64) []html.FriendItem {
+	items := make([]html.FriendItem, len(friends))
+	for i, f := range friends {
+		items[i] = html.FriendItem{User: f.User, DirectGroupID: f.DirectGroupID, Net: nets[f.User.ID]}
+	}
+	return items
+}
+
+// Activity renders recent expenses across all of the user's groups and
+// friends.
 func (h *HomeHandler) Activity(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
@@ -96,76 +125,15 @@ func (h *HomeHandler) Activity(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	if q := r.URL.Query().Get("with"); q != "" {
-		friendID, ok := parseFormID(q)
-		if !ok || friendID == me.ID {
-			panic(splitgo.NotFound.New("Friend not found"))
-		}
-		h.friendActivity(w, r, me, friendID, groups)
-		return
-	}
-
 	expenses, err := model.ListUserExpenses(ctx, h.DB, me.ID, nil, activityLimit)
 	if err != nil {
 		panic(err)
 	}
 
-	groupsByID := map[snowflake.ID]*domain.Group{}
-	for _, g := range groups {
-		groupsByID[g.ID] = g
-	}
-
 	people := html.People{me.ID: me}
 	h.addPeople(ctx, people, expensePeopleIDs(expenses...))
 
-	server.RenderPage(w, r, h.SM, "Activity", html.ActivityMain(me, expenses, groupsByID, people))
-}
-
-func (h *HomeHandler) friendActivity(w http.ResponseWriter, r *http.Request, me *domain.User, friendID snowflake.ID, groups []*domain.Group) {
-	ctx := r.Context()
-
-	expenses, err := model.ListUserExpensesWith(ctx, h.DB, me.ID, friendID, nil, activityLimit)
-	if err != nil {
-		panic(err)
-	}
-
-	// Only show people the user shares a group or expenses with.
-	if len(expenses) == 0 {
-		shares, err := model.SharesGroup(ctx, h.DB, me.ID, friendID)
-		if err != nil {
-			panic(err)
-		}
-		if !shares {
-			panic(splitgo.NotFound.New("Friend not found"))
-		}
-	}
-
-	debts, err := model.UserDebts(ctx, h.DB, me.ID, groups)
-	if err != nil {
-		panic(err)
-	}
-
-	var balances []domain.Balance
-	for _, b := range domain.Balances(me.ID, debts) {
-		if b.UserID == friendID {
-			balances = append(balances, b)
-		}
-	}
-
-	groupsByID := map[snowflake.ID]*domain.Group{}
-	for _, g := range groups {
-		groupsByID[g.ID] = g
-	}
-
-	people := html.People{me.ID: me}
-	h.addPeople(ctx, people, append(expensePeopleIDs(expenses...), friendID))
-
-	friend, ok := people[friendID]
-	if !ok {
-		panic(splitgo.NotFound.New("Friend not found"))
-	}
-
-	server.RenderPage(w, r, h.SM, friend.DisplayName(), html.FriendActivityMain(me, friend, balances, expenses, groupsByID, people))
+	server.RenderPage(w, r, h.SM, "Activity", html.ActivityMain(me, expenses, h.ledgerLabels(ctx, me.ID, groups), people))
 }
 
 // Account renders and updates the account settings.

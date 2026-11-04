@@ -91,9 +91,20 @@ func (h *PushHandler) Unsubscribe(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// ledgerTitle returns the notification title and page for a change in a
+// group, seen by the other members. For non-group expenses with a friend
+// that is the friend who made the change.
+func ledgerTitle(data html.GroupData) (title, path string) {
+	if data.Group.Direct() {
+		return data.Me.DisplayName(), html.FriendURL(data.Me.ID)
+	}
+	return data.Group.Name, groupPath(data.Group.ID)
+}
+
 // notifyExpense notifies the payer and participants of a new expense.
 func (d *Deps) notifyExpense(r *http.Request, data html.GroupData, e *domain.Expense) {
 	me := data.Me
+	title, _ := ledgerTitle(data)
 	path := groupPath(data.Group.ID) + "/expenses/" + e.ID.String()
 	total := html.Fmt(e.Amount, e.Currency)
 
@@ -104,7 +115,7 @@ func (d *Deps) notifyExpense(r *http.Request, data html.GroupData, e *domain.Exp
 			body += fmt.Sprintf(", your share %s", html.Fmt(share, e.Currency))
 		}
 		d.Push.Notify(r.Context(), []snowflake.ID{id}, push.Message{
-			Title: data.Group.Name,
+			Title: title,
 			Body:  body,
 			URL:   path,
 			Tag:   e.ID.String(),
@@ -116,6 +127,7 @@ func (d *Deps) notifyExpense(r *http.Request, data html.GroupData, e *domain.Exp
 func (d *Deps) notifySettlement(r *http.Request, data html.GroupData, e *domain.Expense, to snowflake.ID) {
 	me := data.Me
 	amount := html.Fmt(e.Amount, e.Currency)
+	title, path := ledgerTitle(data)
 
 	for _, id := range lo.Uniq(lo.Without([]snowflake.ID{e.PaidBy, to}, me.ID)) {
 		var body string
@@ -131,9 +143,9 @@ func (d *Deps) notifySettlement(r *http.Request, data html.GroupData, e *domain.
 		}
 
 		d.Push.Notify(r.Context(), []snowflake.ID{id}, push.Message{
-			Title: data.Group.Name,
+			Title: title,
 			Body:  body,
-			URL:   groupPath(data.Group.ID),
+			URL:   path,
 			Tag:   e.ID.String(),
 		})
 	}

@@ -87,6 +87,12 @@ func (h *GroupHandler) Show(w http.ResponseWriter, r *http.Request) {
 	req := decode[contract.GroupPage](r)
 	d := h.loadGroup(ctx, me, req.GroupID)
 
+	// Non-group expenses with a friend are shown on the friend page.
+	if d.Group.Direct() {
+		http.Redirect(w, r, d.LedgerURL(), http.StatusSeeOther)
+		return
+	}
+
 	var cursor *model.ExpenseCursor
 	if req.AfterDate != "" && req.AfterID != 0 {
 		cursor = &model.ExpenseCursor{Date: req.AfterDate, ID: req.AfterID}
@@ -133,7 +139,7 @@ func (h *GroupHandler) Settings(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
 	req := decode[contract.GroupPath](r)
-	d := h.loadGroup(ctx, me, req.GroupID)
+	d := h.loadOrdinaryGroup(ctx, me, req.GroupID)
 
 	h.renderSettings(w, r, d, contract.GroupForm{
 		Name:          d.Group.Name,
@@ -189,7 +195,7 @@ func (h *GroupHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
 	req := decode[contract.GroupForm](r)
-	d := h.loadGroup(ctx, me, req.GroupID)
+	d := h.loadOrdinaryGroup(ctx, me, req.GroupID)
 
 	if errs := req.Validate(); len(errs) > 0 {
 		h.renderSettings(w, r, d, *req, errs, "", nil)
@@ -217,7 +223,7 @@ func (h *GroupHandler) AddMember(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
 	req := decode[contract.AddMemberForm](r)
-	d := h.loadGroup(ctx, me, req.GroupID)
+	d := h.loadOrdinaryGroup(ctx, me, req.GroupID)
 
 	if errs := req.Validate(); len(errs) > 0 {
 		h.renderSettings(w, r, d, groupForm(d.Group), nil, req.Email, errs)
@@ -277,7 +283,7 @@ func (h *GroupHandler) Leave(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
 	req := decode[contract.GroupPath](r)
-	d := h.loadGroup(ctx, me, req.GroupID)
+	d := h.loadOrdinaryGroup(ctx, me, req.GroupID)
 
 	if settled, _ := h.settledState(ctx, d); !settled {
 		panic(splitgo.PreconditionFailed.New("Settle up your balances before leaving the group"))
@@ -302,7 +308,7 @@ func (h *GroupHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
 	req := decode[contract.GroupPath](r)
-	d := h.loadGroup(ctx, me, req.GroupID)
+	d := h.loadOrdinaryGroup(ctx, me, req.GroupID)
 
 	if d.Group.CreatedBy != me.ID {
 		panic(splitgo.Forbidden.New("Only the creator can delete the group"))

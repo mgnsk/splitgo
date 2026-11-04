@@ -82,7 +82,7 @@ func (h *ExpenseHandler) Create(w http.ResponseWriter, r *http.Request) {
 	h.publishGroup(d.Group.ID, d.Members)
 
 	server.Flash(r, h.SM, "Expense added")
-	http.Redirect(w, r, groupPath(d.Group.ID), http.StatusSeeOther)
+	http.Redirect(w, r, d.LedgerURL(), http.StatusSeeOther)
 }
 
 // Split renders the split section or its live preview (htmx).
@@ -201,7 +201,7 @@ func (h *ExpenseHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	h.publishGroup(d.Group.ID, d.Members)
 
 	server.Flash(r, h.SM, msg)
-	server.Redirect(w, r, groupPath(d.Group.ID))
+	server.Redirect(w, r, d.LedgerURL())
 }
 
 func (h *ExpenseHandler) renderForm(w http.ResponseWriter, r *http.Request, data html.ExpenseFormData) {

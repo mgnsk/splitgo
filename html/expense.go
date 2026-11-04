@@ -53,7 +53,7 @@ func ExpenseFormMain(d ExpenseFormData) Node {
 		Div(Class("page-head"),
 			Div(
 				H1(Text(title)),
-				P(Class("sub"), A(Href(base), Text(d.Group.Name))),
+				P(Class("sub"), ledgerLink(d.GroupData)),
 			),
 		),
 		Form(ID("expense-form"), Class("card stack"), Method("post"), Action(action),
@@ -95,7 +95,7 @@ func ExpenseFormMain(d ExpenseFormData) Node {
 			SplitSection(d),
 			Div(Class("row"),
 				components.SubmitButton("Save", false),
-				A(Class("btn"), Href(base), Text("Cancel")),
+				A(Class("btn"), Href(d.LedgerURL()), Text("Cancel")),
 			),
 		),
 	)
@@ -377,7 +377,7 @@ func ExpenseDetailMain(d GroupData, e *domain.Expense) Node {
 	return Div(Class("stack"),
 		Div(Class("page-head"),
 			Div(Class("grow"),
-				P(Class("sub"), A(Href(base), Text(d.Group.Name))),
+				P(Class("sub"), ledgerLink(d)),
 				H1(Text(title)),
 			),
 		),

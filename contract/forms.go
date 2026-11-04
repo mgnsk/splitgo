@@ -175,3 +175,21 @@ func (f *CodeForm) Validate() url.Values {
 
 	return errs
 }
+
+// FriendForm adds a friend by email.
+type FriendForm struct {
+	Email string `in:"form=email"`
+}
+
+// Validate the form.
+func (f *FriendForm) Validate() url.Values {
+	errs := url.Values{}
+	f.Email = strings.TrimSpace(f.Email)
+	validateEmail(errs, "email", f.Email)
+	return errs
+}
+
+// FriendPath identifies a friend.
+type FriendPath struct {
+	UserID snowflake.ID `in:"path=user_id"`
+}
