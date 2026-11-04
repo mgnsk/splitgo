@@ -41,6 +41,7 @@ func (h *GroupHandler) Register(mux *http.ServeMux) {
 	h.handle(mux, "GET /groups/{group_id}/settings", h.Settings, true)
 	h.handle(mux, "POST /groups/{group_id}/settings", h.UpdateSettings, true)
 	h.handle(mux, "POST /groups/{group_id}/members", h.AddMember, true)
+	h.handle(mux, "POST /groups/{group_id}/invite/reset", h.ResetInvite, true)
 	h.handle(mux, "POST /groups/{group_id}/leave", h.Leave, true)
 	h.handle(mux, "POST /groups/{group_id}/delete", h.Delete, true)
 	h.handle(mux, "GET /join/{token}", h.JoinPage, true)
@@ -295,6 +296,21 @@ func (h *GroupHandler) AddMember(w http.ResponseWriter, r *http.Request) {
 
 	server.Flash(r, h.SM, "Member added")
 	http.Redirect(w, r, groupPath(d.Group.ID)+"/settings", http.StatusSeeOther)
+}
+
+// ResetInvite replaces the group's invite link, so the old one stops working.
+func (h *GroupHandler) ResetInvite(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	me := mustUser(r)
+	req := decode[contract.GroupPath](r)
+	d := h.loadOrdinaryGroup(ctx, me, req.GroupID)
+
+	if err := model.SetGroupInviteCode(ctx, h.DB, d.Group.ID, randomToken(16)); err != nil {
+		panic(err)
+	}
+
+	server.Flash(r, h.SM, "Invite link reset")
+	server.Redirect(w, r, groupPath(d.Group.ID)+"/settings")
 }
 
 // Leave removes the user from the group.

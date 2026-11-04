@@ -57,6 +57,15 @@ func UpdateGroup(ctx context.Context, db bun.IDB, group *domain.Group) error {
 		Exec(ctx))
 }
 
+// SetGroupInviteCode replaces a group's invite code, so the old invite link
+// stops working.
+func SetGroupInviteCode(ctx context.Context, db bun.IDB, groupID snowflake.ID, code string) error {
+	return sqlite.WithErrorChecking(db.NewUpdate().Model((*Group)(nil)).
+		Set("invite_code = ?", code).
+		Where("id = ?", groupID).
+		Exec(ctx))
+}
+
 // DeleteGroup deletes a group with its memberships and expenses.
 func DeleteGroup(ctx context.Context, db bun.IDB, id snowflake.ID) error {
 	return sqlite.WithErrorChecking(db.NewDelete().Model((*Group)(nil)).Where("id = ?", id).Exec(ctx))

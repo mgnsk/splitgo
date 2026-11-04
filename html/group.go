@@ -284,6 +284,10 @@ func GroupSettingsMain(d GroupSettingsData) Node {
 			Label(For("invite-url"), Class("label"), Text("Invite link")),
 			Input(ID("invite-url"), Type("text"), ReadOnly(), Value(d.InviteURL)),
 			P(Class("hint"), Text("Anyone with this link can join the group after signing in.")),
+			Div(Button(Type("button"), Class("btn"),
+				hx.Post(base+"/invite/reset"),
+				hx.Confirm("Reset the invite link? The current link will stop working."),
+				Text("Reset link"))),
 		),
 
 		H2(Class("section-title"), Text("Group settings")),

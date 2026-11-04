@@ -1,6 +1,7 @@
 package html
 
 import (
+	"fmt"
 	"maps"
 	"net/url"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/mgnsk/splitgo/money"
 	"github.com/mgnsk/splitgo/pkg/snowflake"
 	. "maragu.dev/gomponents"
+	hx "maragu.dev/gomponents-htmx"
 	. "maragu.dev/gomponents/html"
 )
 
@@ -103,9 +105,12 @@ func FriendMain(d FriendData) Node {
 		H2(Class("section-title"), Text("Activity")),
 		activityList(d.Me, d.Expenses, labels, d.People),
 
-		If(d.CanRemove, Form(Class("stack-sm"), Method("post"), Action(FriendURL(d.Friend.ID)+"/remove"),
+		If(d.CanRemove, Div(Class("stack-sm"),
 			P(Class("hint"), Text("Removing a friend deletes your non-group expenses with them. Shared groups are not affected.")),
-			Div(Button(Type("submit"), Class("btn btn-danger"), Text("Remove friend"))),
+			Div(Button(Type("button"), Class("btn btn-danger"),
+				hx.Post(FriendURL(d.Friend.ID)+"/remove"),
+				hx.Confirm(fmt.Sprintf("Remove %s and delete your non-group expenses with them for both of you?", name)),
+				Text("Remove friend"))),
 		)),
 	)
 }

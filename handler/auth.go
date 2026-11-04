@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/mgnsk/splitgo"
@@ -78,7 +79,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	email := domain.NormalizeEmail(req.Email)
 
-	allowed, err := h.canSignIn(r.Context(), email)
+	allowed, err := h.canSignIn(r.Context(), email, next)
 	if err != nil {
 		panic(err)
 	}
@@ -159,8 +160,10 @@ func hashCode(tokenHash, code string) string {
 	return hashToken(tokenHash + ":" + code)
 }
 
-// canSignIn reports whether email may sign in.
-func (h *AuthHandler) canSignIn(ctx context.Context, email string) (bool, error) {
+// canSignIn reports whether email may sign in. With signup disabled, new
+// accounts are still allowed when signing in to follow a valid group invite
+// link (next is /join/<code>).
+func (h *AuthHandler) canSignIn(ctx context.Context, email, next string) (bool, error) {
 	if _, err := model.GetUserByEmail(ctx, h.DB, email); err == nil {
 		return true, nil
 	} else if !errors.Is(err, splitgo.NotFound) {
@@ -169,6 +172,14 @@ func (h *AuthHandler) canSignIn(ctx context.Context, email string) (bool, error)
 
 	if h.Config.AllowSignup {
 		return true, nil
+	}
+
+	if code, ok := strings.CutPrefix(next, "/join/"); ok && code != "" && !strings.Contains(code, "/") {
+		if _, err := model.GetGroupByInviteCode(ctx, h.DB, code); err == nil {
+			return true, nil
+		} else if !errors.Is(err, splitgo.NotFound) {
+			return false, err
+		}
 	}
 
 	// The first user can always sign up.
@@ -271,7 +282,7 @@ func (h *AuthHandler) signIn(w http.ResponseWriter, r *http.Request, email, next
 			panic(err)
 		}
 
-		allowed, err := h.canSignIn(ctx, email)
+		allowed, err := h.canSignIn(ctx, email, next)
 		if err != nil {
 			panic(err)
 		}

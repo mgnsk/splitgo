@@ -169,11 +169,14 @@ func (h *ExpenseHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	before := append([]snowflake.ID{e.PaidBy}, e.ParticipantIDs()...)
 	applyResolved(e, resolved, h.now())
 
 	if err := model.UpdateExpense(ctx, h.DB, e); err != nil {
 		panic(err)
 	}
+
+	h.notifyExpenseChanged(r, d, e, before)
 
 	h.publishGroup(d.Group.ID, d.Members)
 
@@ -192,6 +195,8 @@ func (h *ExpenseHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if err := model.DeleteExpense(ctx, h.DB, e.ID, h.now()); err != nil {
 		panic(err)
 	}
+
+	h.notifyExpenseDeleted(r, d, e)
 
 	msg := "Expense deleted"
 	if e.Kind == domain.KindSettlement {
