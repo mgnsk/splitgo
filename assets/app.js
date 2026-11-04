@@ -141,3 +141,41 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   syncSubscription().catch(console.error);
 });
+
+// Reload the installed app when it comes back to the foreground so balances
+// and expenses are never stale. iOS resumes the app showing the page as it
+// was when it was left. Pages with unsaved form input are left alone.
+const standalone =
+  window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+
+let formDirty = false;
+document.addEventListener("input", (event) => {
+  if (event.target instanceof Element && event.target.closest("main form")) {
+    formDirty = true;
+  }
+});
+
+let hiddenAt = 0;
+function refreshIfStale() {
+  if (!standalone || formDirty || hiddenAt === 0) {
+    return;
+  }
+  hiddenAt = 0;
+  window.location.reload();
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    hiddenAt = Date.now();
+  } else {
+    refreshIfStale();
+  }
+});
+
+// Restored from the back/forward cache, e.g. after switching apps on iOS.
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) {
+    hiddenAt = hiddenAt || Date.now();
+    refreshIfStale();
+  }
+});
