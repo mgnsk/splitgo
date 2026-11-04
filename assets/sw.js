@@ -45,7 +45,8 @@ self.addEventListener("push", (event) => {
       body: data.body || "",
       tag: data.tag || undefined,
       icon: "/assets/icons/icon-192.png",
-      badge: "/assets/icons/icon-192.png",
+      // Android draws the status bar badge from the alpha channel only.
+      badge: "/assets/icons/badge-96.png",
       data: { url: data.url || "/" },
     }),
   );
