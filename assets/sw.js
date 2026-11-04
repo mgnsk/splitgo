@@ -51,7 +51,9 @@ self.addEventListener("push", (event) => {
   );
 });
 
-// Open the notification's page, reusing an open window of the app.
+// Open the notification's page. An open app window is told to navigate
+// itself: WindowClient.navigate() is unreliable in the iOS Home Screen app
+// and openWindow() does nothing there when the app is already open.
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const url = new URL(event.notification.data?.url || "/", self.location.origin);
@@ -61,14 +63,13 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(
     (async () => {
       const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-      for (const client of windows) {
-        if (client.url.startsWith(self.location.origin)) {
-          await client.focus();
-          // navigate() fails for windows this worker does not control.
-          return client.navigate(url.href).catch(() => self.clients.openWindow(url.href));
-        }
+      const client =
+        windows.find((c) => c.focused) || windows.find((c) => c.visibilityState === "visible") || windows[0];
+      if (!client) {
+        return self.clients.openWindow(url.href);
       }
-      return self.clients.openWindow(url.href);
+      client.postMessage({ type: "navigate", url: url.pathname + url.search });
+      return client.focus().catch(() => {});
     })(),
   );
 });

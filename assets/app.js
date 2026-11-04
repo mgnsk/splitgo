@@ -156,12 +156,34 @@ document.addEventListener("input", (event) => {
 });
 
 let hiddenAt = 0;
+let navigating = false;
+
 function refreshIfStale() {
   if (!standalone || formDirty || hiddenAt === 0) {
     return;
   }
   hiddenAt = 0;
-  window.location.reload();
+  // Wait briefly: when the app was brought up by tapping a notification, the
+  // service worker's navigate message follows and takes precedence.
+  setTimeout(() => {
+    if (!navigating) {
+      window.location.reload();
+    }
+  }, 300);
+}
+
+// Tapping a notification while the app is open: go to its page. Assigning
+// the current URL reloads it, so the view is fresh either way.
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data || data.type !== "navigate" || typeof data.url !== "string" || !data.url.startsWith("/") || data.url.startsWith("//")) {
+      return;
+    }
+    navigating = true;
+    window.location.assign(data.url);
+  });
+  navigator.serviceWorker.startMessages();
 }
 
 document.addEventListener("visibilitychange", () => {
