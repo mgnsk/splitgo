@@ -301,11 +301,16 @@ func SplitPreview(d ExpenseFormData) Node {
 		return Div(ID("split-preview"), Class("options"),
 			Map(split.Presets, func(p split.Preset) Node {
 				sentence := "Enter an amount"
+				tone := "muted"
 				if amountOK {
 					pf := *f
 					pf.Preset = p
 					if res, errs := pf.ResolveSplit(me, d.Participants, amount, cur); len(errs) == 0 {
 						sentence = presetSentence(res, me, other, otherName, cur)
+						tone = "neg"
+						if res.PaidBy == me {
+							tone = "pos"
+						}
 					}
 				}
 
@@ -313,7 +318,7 @@ func SplitPreview(d ExpenseFormData) Node {
 					Input(Type("radio"), Name("preset"), Value(string(p)), If(f.Preset == p, Checked())),
 					Div(Class("grow"),
 						Div(Class("title"), Text(titles[p])),
-						Div(Class("muted small"), Text(sentence)),
+						Div(Class(tone+" small"), Text(sentence)),
 					),
 				)
 			}),
