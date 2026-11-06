@@ -28,6 +28,7 @@ import (
 	"github.com/mgnsk/webkit/snowflake"
 	"github.com/mgnsk/webkit/web"
 	"github.com/uptrace/bun"
+	"maragu.dev/gomponents"
 )
 
 // Config is the handler configuration.
@@ -72,7 +73,7 @@ func (d *Deps) middlewares(requireUser bool) []web.Middleware {
 		server.NewUserMiddleware(d.DB, d.SM),
 	}
 	if requireUser {
-		mws = append(mws, server.RequireUser)
+		mws = append(mws, session.RequireUser(server.UserKey, "/login"))
 	}
 	return mws
 }
@@ -197,7 +198,21 @@ func safeNext(next string) string {
 
 // New builds the application HTTP handler with all routes.
 func New(deps *Deps) http.Handler {
-	return server.NewHandler(
+	return web.NewHandler(web.Options{
+		Errors: web.ErrorRenderer{
+			Page: func(r *http.Request, code int, msg string) gomponents.Node {
+				return html.Page(html.PageProps{
+					Title:    "Error",
+					Path:     r.URL.Path,
+					Children: html.ErrorMain(code, msg),
+				})
+			},
+			Toast: func(msg string) gomponents.Node {
+				return html.Toast(false, msg)
+			},
+			ToastTarget: "#toast",
+		},
+	},
 		splitgo.RegisterAssetsHandler,
 		NewAuthHandler(deps).Register,
 		NewHomeHandler(deps).Register,

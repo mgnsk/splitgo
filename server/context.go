@@ -1,3 +1,4 @@
+// Package server glues the webkit framework to the splitgo views and models.
 package server
 
 import (

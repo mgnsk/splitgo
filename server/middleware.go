@@ -23,7 +23,3 @@ func NewUserMiddleware(db *bun.DB, sm *scs.SessionManager) web.Middleware {
 		return model.GetUser(ctx, db, snowflake.ID(id))
 	}, "/login")
 }
-
-// RequireUser is a middleware that requires a logged in user.
-// Anonymous page requests are redirected to the login page.
-var RequireUser = session.RequireUser(UserKey, "/login")
