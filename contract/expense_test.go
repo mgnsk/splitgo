@@ -6,7 +6,7 @@ import (
 
 	"github.com/mgnsk/splitgo/contract"
 	"github.com/mgnsk/splitgo/domain"
-	"github.com/mgnsk/splitgo/pkg/snowflake"
+	"github.com/mgnsk/webkit/snowflake"
 	"github.com/mgnsk/splitgo/split"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

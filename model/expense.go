@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/mgnsk/splitgo"
 	"github.com/mgnsk/splitgo/domain"
-	"github.com/mgnsk/splitgo/pkg/snowflake"
-	"github.com/mgnsk/splitgo/pkg/sqlite"
 	"github.com/mgnsk/splitgo/split"
+	"github.com/mgnsk/webkit"
+	"github.com/mgnsk/webkit/snowflake"
+	"github.com/mgnsk/webkit/sqlite"
 	"github.com/samber/lo"
 	"github.com/uptrace/bun"
 )
@@ -210,19 +210,19 @@ func orderParticipants(q *bun.SelectQuery) *bun.SelectQuery {
 
 func validateExpense(e *domain.Expense) error {
 	if e.Amount <= 0 {
-		return splitgo.InvalidValue.New("Amount must be positive")
+		return webkit.InvalidValue.New("Amount must be positive")
 	}
 
 	var sum int64
 	for _, p := range e.Participants {
 		if p.Share < 0 {
-			return splitgo.InvalidValue.New("Shares must not be negative")
+			return webkit.InvalidValue.New("Shares must not be negative")
 		}
 		sum += p.Share
 	}
 
 	if sum != e.Amount {
-		return splitgo.InvalidValue.New("Shares must add up to the amount")
+		return webkit.InvalidValue.New("Shares must add up to the amount")
 	}
 
 	return nil
@@ -230,7 +230,7 @@ func validateExpense(e *domain.Expense) error {
 
 func insertParticipants(ctx context.Context, tx bun.Tx, e *domain.Expense) error {
 	if len(e.Participants) == 0 {
-		return splitgo.InvalidValue.New("Expense must have participants")
+		return webkit.InvalidValue.New("Expense must have participants")
 	}
 
 	models := lo.Map(e.Participants, func(p domain.Participant, _ int) *ExpenseParticipant {

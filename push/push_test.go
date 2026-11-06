@@ -14,8 +14,8 @@ import (
 	"github.com/mgnsk/splitgo"
 	"github.com/mgnsk/splitgo/domain"
 	"github.com/mgnsk/splitgo/model"
-	"github.com/mgnsk/splitgo/pkg/snowflake"
-	"github.com/mgnsk/splitgo/pkg/sqlite"
+	"github.com/mgnsk/webkit/snowflake"
+	"github.com/mgnsk/webkit/sqlite"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/uptrace/bun"
@@ -47,9 +47,9 @@ var _ = Describe("WebPush", func() {
 	)
 
 	BeforeEach(func(ctx SpecContext) {
-		db = sqlite.NewDB(":memory:").Connect()
+		db = sqlite.NewDB(":memory:").WithForeignKeys().Connect()
 		DeferCleanup(db.Close)
-		Expect(splitgo.MigrateUp(db.DB)).To(Succeed())
+		Expect(sqlite.MigrateUp(db.DB, splitgo.Migrations, "migrations")).To(Succeed())
 
 		user = &domain.User{ID: snowflake.Generate(), Email: "alice@example.com", Currency: "EUR"}
 		Expect(model.InsertUser(ctx, db, user)).To(Succeed())

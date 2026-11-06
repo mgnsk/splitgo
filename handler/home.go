@@ -3,13 +3,15 @@ package handler
 import (
 	"net/http"
 
-	"github.com/mgnsk/splitgo"
 	"github.com/mgnsk/splitgo/contract"
 	"github.com/mgnsk/splitgo/domain"
 	"github.com/mgnsk/splitgo/html"
 	"github.com/mgnsk/splitgo/model"
-	"github.com/mgnsk/splitgo/pkg/snowflake"
 	"github.com/mgnsk/splitgo/server"
+	"github.com/mgnsk/webkit"
+	"github.com/mgnsk/webkit/session"
+	"github.com/mgnsk/webkit/snowflake"
+	"github.com/mgnsk/webkit/web"
 )
 
 const activityLimit = 50
@@ -147,7 +149,7 @@ func (h *HomeHandler) Account(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req := decode[contract.AccountForm](r)
+	req := web.Decode[contract.AccountForm](r)
 	if errs := req.Validate(); len(errs) > 0 {
 		server.RenderPage(w, r, h.SM, "Account", html.AccountMain(me, *req, errs, h.Push.PublicKey()))
 		return
@@ -162,7 +164,7 @@ func (h *HomeHandler) Account(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	server.Flash(r, h.SM, "Account saved")
+	session.Flash(r.Context(), h.SM, "Account saved")
 	http.Redirect(w, r, "/account", http.StatusSeeOther)
 }
 
@@ -173,7 +175,7 @@ func (h *HomeHandler) SetTimezone(w http.ResponseWriter, r *http.Request) {
 	tz := r.PostFormValue("timezone")
 
 	if !domain.ValidTimezone(tz) {
-		panic(splitgo.InvalidValue.New("Unknown time zone"))
+		panic(webkit.InvalidValue.New("Unknown time zone"))
 	}
 
 	if tz != me.Timezone {
@@ -189,10 +191,10 @@ func (h *HomeHandler) SetTimezone(w http.ResponseWriter, r *http.Request) {
 // to the current page.
 func (h *HomeHandler) SetTheme(w http.ResponseWriter, r *http.Request) {
 	me := mustUser(r)
-	req := decode[contract.ThemeForm](r)
+	req := web.Decode[contract.ThemeForm](r)
 
 	if errs := req.Validate(); len(errs) > 0 {
-		panic(splitgo.InvalidValue.New(errs.Get("theme")))
+		panic(webkit.InvalidValue.New(errs.Get("theme")))
 	}
 
 	updated := *me

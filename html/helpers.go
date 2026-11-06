@@ -7,7 +7,7 @@ import (
 
 	"github.com/mgnsk/splitgo/domain"
 	"github.com/mgnsk/splitgo/money"
-	"github.com/mgnsk/splitgo/pkg/snowflake"
+	"github.com/mgnsk/webkit/snowflake"
 	. "maragu.dev/gomponents"
 	. "maragu.dev/gomponents/components"
 	. "maragu.dev/gomponents/html"

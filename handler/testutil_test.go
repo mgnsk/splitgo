@@ -18,8 +18,8 @@ import (
 	"github.com/mgnsk/splitgo/live"
 	"github.com/mgnsk/splitgo/mail"
 	"github.com/mgnsk/splitgo/model"
-	"github.com/mgnsk/splitgo/pkg/snowflake"
 	"github.com/mgnsk/splitgo/server"
+	"github.com/mgnsk/webkit/snowflake"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

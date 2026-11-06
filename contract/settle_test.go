@@ -2,7 +2,7 @@ package contract_test
 
 import (
 	"github.com/mgnsk/splitgo/contract"
-	"github.com/mgnsk/splitgo/pkg/snowflake"
+	"github.com/mgnsk/webkit/snowflake"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

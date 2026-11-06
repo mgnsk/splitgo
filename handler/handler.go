@@ -15,17 +15,20 @@ import (
 	"time"
 
 	"github.com/alexedwards/scs/v2"
-	"github.com/ggicci/httpin"
 	"github.com/mgnsk/splitgo"
 	"github.com/mgnsk/splitgo/domain"
 	"github.com/mgnsk/splitgo/html"
 	"github.com/mgnsk/splitgo/live"
 	"github.com/mgnsk/splitgo/mail"
 	"github.com/mgnsk/splitgo/model"
-	"github.com/mgnsk/splitgo/pkg/snowflake"
 	"github.com/mgnsk/splitgo/push"
 	"github.com/mgnsk/splitgo/server"
+	"github.com/mgnsk/webkit"
+	"github.com/mgnsk/webkit/session"
+	"github.com/mgnsk/webkit/snowflake"
+	"github.com/mgnsk/webkit/web"
 	"github.com/uptrace/bun"
+	"maragu.dev/gomponents"
 )
 
 // Config is the handler configuration.
@@ -64,37 +67,28 @@ func (d *Deps) userNow(user *domain.User) time.Time {
 }
 
 // middlewares returns the common middlewares for pages.
-func (d *Deps) middlewares(requireUser bool) []server.MiddlewareFunc {
-	mws := []server.MiddlewareFunc{
-		server.NewSessionMiddleware(d.SM),
+func (d *Deps) middlewares(requireUser bool) []web.Middleware {
+	mws := []web.Middleware{
+		session.Middleware(d.SM),
 		server.NewUserMiddleware(d.DB, d.SM),
 	}
 	if requireUser {
-		mws = append(mws, server.RequireUser)
+		mws = append(mws, session.RequireUser(server.UserKey, "/login"))
 	}
 	return mws
 }
 
 func (d *Deps) handle(mux *http.ServeMux, pattern string, h http.HandlerFunc, requireUser bool) {
-	mux.Handle(pattern, server.WithMiddleware(h, d.middlewares(requireUser)...))
+	mux.Handle(pattern, web.Chain(h, d.middlewares(requireUser)...))
 }
 
 // mustUser returns the logged in user.
 func mustUser(r *http.Request) *domain.User {
-	user := server.GetUser(r.Context())
+	user := server.UserKey.Get(r.Context())
 	if user == nil {
-		panic(splitgo.Forbidden.New("Must be logged in"))
+		panic(webkit.Forbidden.New("Must be logged in"))
 	}
 	return user
-}
-
-// decode decodes the request into a new V or panics.
-func decode[V any](r *http.Request) *V {
-	v := new(V)
-	if err := httpin.DecodeTo(r, v); err != nil {
-		panic(err)
-	}
-	return v
 }
 
 // loadGroup loads a group the user is a member of along with its members.
@@ -102,8 +96,8 @@ func decode[V any](r *http.Request) *V {
 func (d *Deps) loadGroup(ctx context.Context, me *domain.User, groupID snowflake.ID) html.GroupData {
 	group, err := model.GetUserGroup(ctx, d.DB, me.ID, groupID)
 	if err != nil {
-		if errors.Is(err, splitgo.NotFound) {
-			panic(splitgo.NotFound.New("Group not found"))
+		if errors.Is(err, webkit.NotFound) {
+			panic(webkit.NotFound.New("Group not found"))
 		}
 		panic(err)
 	}
@@ -127,7 +121,7 @@ func (d *Deps) loadGroup(ctx context.Context, me *domain.User, groupID snowflake
 func (d *Deps) loadOrdinaryGroup(ctx context.Context, me *domain.User, groupID snowflake.ID) html.GroupData {
 	data := d.loadGroup(ctx, me, groupID)
 	if data.Group.Direct() {
-		panic(splitgo.NotFound.New("Group not found"))
+		panic(webkit.NotFound.New("Group not found"))
 	}
 	return data
 }
@@ -204,7 +198,21 @@ func safeNext(next string) string {
 
 // New builds the application HTTP handler with all routes.
 func New(deps *Deps) http.Handler {
-	return server.NewHandler(
+	return web.NewHandler(web.Options{
+		Errors: web.ErrorRenderer{
+			Page: func(r *http.Request, code int, msg string) gomponents.Node {
+				return html.Page(html.PageProps{
+					Title:    "Error",
+					Path:     r.URL.Path,
+					Children: html.ErrorMain(code, msg),
+				})
+			},
+			Toast: func(msg string) gomponents.Node {
+				return html.Toast(false, msg)
+			},
+			ToastTarget: "#toast",
+		},
+	},
 		splitgo.RegisterAssetsHandler,
 		NewAuthHandler(deps).Register,
 		NewHomeHandler(deps).Register,

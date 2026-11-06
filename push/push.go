@@ -15,7 +15,7 @@ import (
 
 	webpush "github.com/SherClockHolmes/webpush-go"
 	"github.com/mgnsk/splitgo/model"
-	"github.com/mgnsk/splitgo/pkg/snowflake"
+	"github.com/mgnsk/webkit/snowflake"
 	"github.com/uptrace/bun"
 )
 

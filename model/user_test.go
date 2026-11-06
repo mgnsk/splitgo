@@ -1,11 +1,11 @@
 package model_test
 
 import (
-	"github.com/mgnsk/splitgo"
 	"github.com/mgnsk/splitgo/domain"
 	"github.com/mgnsk/splitgo/model"
-	"github.com/mgnsk/splitgo/pkg/snowflake"
-	. "github.com/mgnsk/splitgo/pkg/testing"
+	"github.com/mgnsk/webkit"
+	"github.com/mgnsk/webkit/snowflake"
+	. "github.com/mgnsk/webkit/testutil"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -24,7 +24,7 @@ var _ = Describe("users", func() {
 	It("rejects duplicate emails", func(ctx SpecContext) {
 		mustCreateUser(ctx, "a@example.com")
 		err := model.InsertUser(ctx, db, &domain.User{ID: snowflake.Generate(), Email: "A@example.com", Currency: "EUR"})
-		Expect(err).To(MatchError(splitgo.AlreadyExists))
+		Expect(err).To(MatchError(webkit.AlreadyExists))
 	})
 
 	It("updates the profile", func(ctx SpecContext) {
@@ -40,6 +40,6 @@ var _ = Describe("users", func() {
 
 	It("returns NotFound for unknown users", func(ctx SpecContext) {
 		_, err := model.GetUserByEmail(ctx, db, "nobody@example.com")
-		Expect(err).To(MatchError(splitgo.NotFound))
+		Expect(err).To(MatchError(webkit.NotFound))
 	})
 })

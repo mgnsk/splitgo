@@ -8,16 +8,18 @@ import (
 	"net/url"
 	"slices"
 
-	"github.com/mgnsk/splitgo"
 	"github.com/mgnsk/splitgo/contract"
 	"github.com/mgnsk/splitgo/domain"
 	"github.com/mgnsk/splitgo/html"
 	"github.com/mgnsk/splitgo/live"
 	"github.com/mgnsk/splitgo/mail"
 	"github.com/mgnsk/splitgo/model"
-	"github.com/mgnsk/splitgo/pkg/snowflake"
 	"github.com/mgnsk/splitgo/push"
 	"github.com/mgnsk/splitgo/server"
+	"github.com/mgnsk/webkit"
+	"github.com/mgnsk/webkit/session"
+	"github.com/mgnsk/webkit/snowflake"
+	"github.com/mgnsk/webkit/web"
 )
 
 // FriendHandler handles friends and their non-group expenses.
@@ -49,7 +51,7 @@ func (h *FriendHandler) New(w http.ResponseWriter, r *http.Request) {
 func (h *FriendHandler) Create(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
-	req := decode[contract.FriendForm](r)
+	req := web.Decode[contract.FriendForm](r)
 
 	errs := req.Validate()
 	email := domain.NormalizeEmail(req.Email)
@@ -62,7 +64,7 @@ func (h *FriendHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	alreadyFriends := func(friend *domain.User) {
-		server.Flash(r, h.SM, fmt.Sprintf("%s is already your friend", friend.DisplayName()))
+		session.Flash(r.Context(), h.SM, fmt.Sprintf("%s is already your friend", friend.DisplayName()))
 		http.Redirect(w, r, html.FriendURL(friend.ID), http.StatusSeeOther)
 	}
 
@@ -73,7 +75,7 @@ func (h *FriendHandler) Create(w http.ResponseWriter, r *http.Request) {
 			alreadyFriends(friend)
 			return
 		}
-	case !errors.Is(err, splitgo.NotFound):
+	case !errors.Is(err, webkit.NotFound):
 		panic(err)
 	}
 
@@ -123,7 +125,7 @@ func (h *FriendHandler) Create(w http.ResponseWriter, r *http.Request) {
 	})
 	h.Live.Publish([]snowflake.ID{friend.ID}, live.Event{GroupID: group.ID})
 
-	server.Flash(r, h.SM, "Friend added")
+	session.Flash(r.Context(), h.SM, "Friend added")
 	http.Redirect(w, r, html.FriendURL(friend.ID), http.StatusSeeOther)
 }
 
@@ -132,11 +134,11 @@ func (h *FriendHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *FriendHandler) Show(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
-	req := decode[contract.FriendPath](r)
+	req := web.Decode[contract.FriendPath](r)
 	friendID := req.UserID
 
 	if friendID == me.ID {
-		panic(splitgo.NotFound.New("Friend not found"))
+		panic(webkit.NotFound.New("Friend not found"))
 	}
 
 	direct := h.directGroup(ctx, me.ID, friendID)
@@ -152,7 +154,7 @@ func (h *FriendHandler) Show(w http.ResponseWriter, r *http.Request) {
 			panic(err)
 		}
 		if !shares {
-			panic(splitgo.NotFound.New("Friend not found"))
+			panic(webkit.NotFound.New("Friend not found"))
 		}
 	}
 
@@ -186,7 +188,7 @@ func (h *FriendHandler) Show(w http.ResponseWriter, r *http.Request) {
 
 	friend, ok := people[friendID]
 	if !ok {
-		panic(splitgo.NotFound.New("Friend not found"))
+		panic(webkit.NotFound.New("Friend not found"))
 	}
 
 	labels := h.ledgerLabels(ctx, me.ID, groups)
@@ -213,11 +215,11 @@ func (h *FriendHandler) Show(w http.ResponseWriter, r *http.Request) {
 func (h *FriendHandler) Remove(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
-	req := decode[contract.FriendPath](r)
+	req := web.Decode[contract.FriendPath](r)
 
 	direct := h.directGroup(ctx, me.ID, req.UserID)
 	if direct == nil {
-		panic(splitgo.NotFound.New("Friend not found"))
+		panic(webkit.NotFound.New("Friend not found"))
 	}
 
 	debts, err := model.GroupDebts(ctx, h.DB, direct)
@@ -225,7 +227,7 @@ func (h *FriendHandler) Remove(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 	if len(debts) > 0 {
-		panic(splitgo.PreconditionFailed.New("Settle up before removing the friend"))
+		panic(webkit.PreconditionFailed.New("Settle up before removing the friend"))
 	}
 
 	if err := model.DeleteGroup(ctx, h.DB, direct.ID); err != nil {
@@ -234,8 +236,8 @@ func (h *FriendHandler) Remove(w http.ResponseWriter, r *http.Request) {
 
 	h.Live.Publish([]snowflake.ID{req.UserID}, live.Event{GroupID: direct.ID})
 
-	server.Flash(r, h.SM, "Friend removed")
-	server.Redirect(w, r, "/")
+	session.Flash(r.Context(), h.SM, "Friend removed")
+	web.Redirect(w, r, "/")
 }
 
 // ChooseLedger renders the list of friends and groups to add an expense
@@ -280,7 +282,7 @@ func (d *Deps) recordInvite(ctx context.Context, me *domain.User) {
 // not friends.
 func (d *Deps) directGroup(ctx context.Context, a, b snowflake.ID) *domain.Group {
 	g, err := model.GetDirectGroup(ctx, d.DB, a, b)
-	if errors.Is(err, splitgo.NotFound) {
+	if errors.Is(err, webkit.NotFound) {
 		return nil
 	}
 	if err != nil {

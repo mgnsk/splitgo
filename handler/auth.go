@@ -12,15 +12,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mgnsk/splitgo"
 	"github.com/mgnsk/splitgo/contract"
 	"github.com/mgnsk/splitgo/domain"
 	"github.com/mgnsk/splitgo/html"
 	"github.com/mgnsk/splitgo/mail"
 	"github.com/mgnsk/splitgo/model"
 	"github.com/mgnsk/splitgo/money"
-	"github.com/mgnsk/splitgo/pkg/snowflake"
 	"github.com/mgnsk/splitgo/server"
+	"github.com/mgnsk/webkit"
+	"github.com/mgnsk/webkit/snowflake"
+	"github.com/mgnsk/webkit/web"
 )
 
 const (
@@ -60,7 +61,7 @@ func (h *AuthHandler) Register(mux *http.ServeMux) {
 
 // LoginPage renders the login form.
 func (h *AuthHandler) LoginPage(w http.ResponseWriter, r *http.Request) {
-	if server.GetUser(r.Context()) != nil {
+	if server.UserKey.Get(r.Context()) != nil {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
@@ -70,7 +71,7 @@ func (h *AuthHandler) LoginPage(w http.ResponseWriter, r *http.Request) {
 
 // Login emails a sign-in link and code.
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	req := decode[contract.LoginForm](r)
+	req := web.Decode[contract.LoginForm](r)
 	next := safeNext(req.Next)
 
 	if errs := req.Validate(); len(errs) > 0 {
@@ -167,7 +168,7 @@ func hashCode(tokenHash, code string) string {
 func (h *AuthHandler) canSignIn(ctx context.Context, email, next string) (bool, error) {
 	if _, err := model.GetUserByEmail(ctx, h.DB, email); err == nil {
 		return true, nil
-	} else if !errors.Is(err, splitgo.NotFound) {
+	} else if !errors.Is(err, webkit.NotFound) {
 		return false, err
 	}
 
@@ -178,7 +179,7 @@ func (h *AuthHandler) canSignIn(ctx context.Context, email, next string) (bool, 
 	if code, ok := strings.CutPrefix(next, "/join/"); ok && code != "" && !strings.Contains(code, "/") {
 		if _, err := model.GetGroupByInviteCode(ctx, h.DB, code); err == nil {
 			return true, nil
-		} else if !errors.Is(err, splitgo.NotFound) {
+		} else if !errors.Is(err, webkit.NotFound) {
 			return false, err
 		}
 	}
@@ -195,7 +196,7 @@ func (h *AuthHandler) canSignIn(ctx context.Context, email, next string) (bool, 
 // Code signs in with an emailed one-time code.
 func (h *AuthHandler) Code(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	req := decode[contract.CodeForm](r)
+	req := web.Decode[contract.CodeForm](r)
 	next := safeNext(req.Next)
 	email := domain.NormalizeEmail(req.Email)
 
@@ -221,10 +222,10 @@ func (h *AuthHandler) Code(w http.ResponseWriter, r *http.Request) {
 		return hashCode(tokenHash, req.Code)
 	}, h.now())
 	switch {
-	case errors.Is(err, splitgo.NotFound):
+	case errors.Is(err, webkit.NotFound):
 		render("This code has expired. Request a new one.")
 		return
-	case errors.Is(err, splitgo.InvalidValue):
+	case errors.Is(err, webkit.InvalidValue):
 		render("Wrong code. Check the email and try again.")
 		return
 	case err != nil:
@@ -237,11 +238,11 @@ func (h *AuthHandler) Code(w http.ResponseWriter, r *http.Request) {
 // ConfirmPage renders a page asking to confirm the sign in. Confirming with
 // POST prevents email link scanners from consuming the token.
 func (h *AuthHandler) ConfirmPage(w http.ResponseWriter, r *http.Request) {
-	req := decode[contract.TokenPath](r)
+	req := web.Decode[contract.TokenPath](r)
 
 	email, err := model.GetLoginToken(r.Context(), h.DB, hashToken(req.Token), h.now())
 	if err != nil {
-		if errors.Is(err, splitgo.NotFound) {
+		if errors.Is(err, webkit.NotFound) {
 			server.RenderPage(w, r, h.SM, "Link expired", html.InvalidLinkMain())
 			return
 		}
@@ -258,11 +259,11 @@ func (h *AuthHandler) ConfirmPage(w http.ResponseWriter, r *http.Request) {
 
 // Confirm consumes the sign-in token and logs the user in.
 func (h *AuthHandler) Confirm(w http.ResponseWriter, r *http.Request) {
-	req := decode[contract.TokenPath](r)
+	req := web.Decode[contract.TokenPath](r)
 
 	email, err := model.ConsumeLoginToken(r.Context(), h.DB, hashToken(req.Token), h.now())
 	if err != nil {
-		if errors.Is(err, splitgo.NotFound) {
+		if errors.Is(err, webkit.NotFound) {
 			server.RenderPage(w, r, h.SM, "Link expired", html.InvalidLinkMain())
 			return
 		}
@@ -279,7 +280,7 @@ func (h *AuthHandler) signIn(w http.ResponseWriter, r *http.Request, email, next
 
 	user, err := model.GetUserByEmail(ctx, h.DB, email)
 	if err != nil {
-		if !errors.Is(err, splitgo.NotFound) {
+		if !errors.Is(err, webkit.NotFound) {
 			panic(err)
 		}
 

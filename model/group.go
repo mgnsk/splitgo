@@ -6,10 +6,10 @@ import (
 	"encoding/base64"
 	"errors"
 
-	"github.com/mgnsk/splitgo"
 	"github.com/mgnsk/splitgo/domain"
-	"github.com/mgnsk/splitgo/pkg/snowflake"
-	"github.com/mgnsk/splitgo/pkg/sqlite"
+	"github.com/mgnsk/webkit"
+	"github.com/mgnsk/webkit/snowflake"
+	"github.com/mgnsk/webkit/sqlite"
 	"github.com/samber/lo"
 	"github.com/uptrace/bun"
 )
@@ -180,12 +180,12 @@ func GetDirectGroup(ctx context.Context, db bun.IDB, a, b snowflake.ID) (*domain
 // with both as members. created reports whether it was created.
 func GetOrCreateDirectGroup(ctx context.Context, db bun.IDB, a, b snowflake.ID, currency string) (group *domain.Group, created bool, err error) {
 	if a == b {
-		return nil, false, splitgo.InvalidValue.New("Can not be friends with yourself")
+		return nil, false, webkit.InvalidValue.New("Can not be friends with yourself")
 	}
 
 	err = db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		group, err = GetDirectGroup(ctx, tx, a, b)
-		if err == nil || !errors.Is(err, splitgo.NotFound) {
+		if err == nil || !errors.Is(err, webkit.NotFound) {
 			return err
 		}
 

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mgnsk/splitgo/pkg/snowflake"
+	"github.com/mgnsk/webkit/snowflake"
 )
 
 // User is a user, identified by email address.

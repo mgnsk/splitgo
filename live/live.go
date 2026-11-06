@@ -4,7 +4,7 @@ package live
 import (
 	"sync"
 
-	"github.com/mgnsk/splitgo/pkg/snowflake"
+	"github.com/mgnsk/webkit/snowflake"
 )
 
 // Event is a change in a group.
