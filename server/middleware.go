@@ -12,21 +12,10 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// MiddlewareFunc is a HTTP middleware function.
-type MiddlewareFunc = web.Middleware
-
-// WithMiddleware applies middleware to run in order before handler.
-var WithMiddleware = web.Chain
-
-// NewSessionMiddleware creates a new session middleware.
-func NewSessionMiddleware(sm *scs.SessionManager) MiddlewareFunc {
-	return session.Middleware(sm)
-}
-
 // NewUserMiddleware creates a middleware that loads the logged in user
 // into the request context. Sessions of deleted users are destroyed.
-func NewUserMiddleware(db *bun.DB, sm *scs.SessionManager) MiddlewareFunc {
-	return session.LoadUser(sm, userKey, func(ctx context.Context, sm *scs.SessionManager) (*domain.User, error) {
+func NewUserMiddleware(db *bun.DB, sm *scs.SessionManager) web.Middleware {
+	return session.LoadUser(sm, UserKey, func(ctx context.Context, sm *scs.SessionManager) (*domain.User, error) {
 		id := sm.GetInt64(ctx, SessionKeyUserID)
 		if id == 0 {
 			return nil, nil
@@ -37,4 +26,4 @@ func NewUserMiddleware(db *bun.DB, sm *scs.SessionManager) MiddlewareFunc {
 
 // RequireUser is a middleware that requires a logged in user.
 // Anonymous page requests are redirected to the login page.
-var RequireUser = session.RequireUser(userKey, "/login")
+var RequireUser = session.RequireUser(UserKey, "/login")

@@ -23,25 +23,9 @@ func RenderPage(
 
 	web.Render(w, html.Page(html.PageProps{
 		Title:        title,
-		User:         GetUser(r.Context()),
+		User:         UserKey.Get(r.Context()),
 		Path:         r.URL.Path,
 		Children:     content,
 		FlashSuccess: successMessage,
 	}))
-}
-
-// RenderPartial renders an HTML fragment.
-func RenderPartial(w http.ResponseWriter, node gomponents.Node) {
-	web.Render(w, node)
-}
-
-// Redirect redirects the client. For htmx requests it sets the HX-Redirect
-// header so that htmx performs a full navigation.
-func Redirect(w http.ResponseWriter, r *http.Request, location string) {
-	web.Redirect(w, r, location)
-}
-
-// Flash sets a success flash message shown on the next page.
-func Flash(r *http.Request, sm *scs.SessionManager, msg string) {
-	session.Flash(r.Context(), sm, msg)
 }

@@ -3,10 +3,10 @@ package model_test
 import (
 	"time"
 
-	"github.com/mgnsk/splitgo"
 	"github.com/mgnsk/splitgo/domain"
 	"github.com/mgnsk/splitgo/model"
 	"github.com/mgnsk/splitgo/split"
+	"github.com/mgnsk/webkit"
 	. "github.com/mgnsk/webkit/testutil"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -42,14 +42,14 @@ var _ = Describe("expenses", func() {
 	It("rejects shares that do not add up to the amount", func(ctx SpecContext) {
 		e := newEqualExpense(g, alice, 1000, "EUR", alice, bob)
 		e.Participants[0].Share++
-		Expect(model.InsertExpense(ctx, db, e)).To(MatchError(splitgo.InvalidValue))
+		Expect(model.InsertExpense(ctx, db, e)).To(MatchError(webkit.InvalidValue))
 	})
 
 	It("rejects non-positive amounts", func(ctx SpecContext) {
 		e := newEqualExpense(g, alice, 1000, "EUR", alice, bob)
 		e.Amount = 0
 		e.Participants = []domain.Participant{{UserID: alice.ID, Share: 0}}
-		Expect(model.InsertExpense(ctx, db, e)).To(MatchError(splitgo.InvalidValue))
+		Expect(model.InsertExpense(ctx, db, e)).To(MatchError(webkit.InvalidValue))
 	})
 
 	It("does not find expenses of another group", func(ctx SpecContext) {
@@ -57,7 +57,7 @@ var _ = Describe("expenses", func() {
 		e := mustAddEqualExpense(ctx, g, alice, 1000, alice, bob)
 
 		_, err := model.GetGroupExpense(ctx, db, other.ID, e.ID)
-		Expect(err).To(MatchError(splitgo.NotFound))
+		Expect(err).To(MatchError(webkit.NotFound))
 	})
 
 	It("updates an expense replacing participants", func(ctx SpecContext) {
@@ -100,9 +100,9 @@ var _ = Describe("expenses", func() {
 		Expect(model.DeleteExpense(ctx, db, e.ID, time.Now())).To(Succeed())
 
 		_, err := model.GetGroupExpense(ctx, db, g.ID, e.ID)
-		Expect(err).To(MatchError(splitgo.NotFound))
-		Expect(model.DeleteExpense(ctx, db, e.ID, time.Now())).To(MatchError(splitgo.PreconditionFailed))
-		Expect(model.UpdateExpense(ctx, db, e)).To(MatchError(splitgo.PreconditionFailed))
+		Expect(err).To(MatchError(webkit.NotFound))
+		Expect(model.DeleteExpense(ctx, db, e.ID, time.Now())).To(MatchError(webkit.PreconditionFailed))
+		Expect(model.UpdateExpense(ctx, db, e)).To(MatchError(webkit.PreconditionFailed))
 	})
 
 	It("lists group expenses newest first with keyset pagination", func(ctx SpecContext) {

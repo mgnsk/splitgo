@@ -1,9 +1,9 @@
 package model_test
 
 import (
-	"github.com/mgnsk/splitgo"
 	"github.com/mgnsk/splitgo/domain"
 	"github.com/mgnsk/splitgo/model"
+	"github.com/mgnsk/webkit"
 	. "github.com/mgnsk/webkit/testutil"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -27,7 +27,7 @@ var _ = Describe("friends", func() {
 		Expect(again.Currency).To(Equal("EUR"))
 
 		_, _, err = model.GetOrCreateDirectGroup(ctx, db, alice.ID, alice.ID, "EUR")
-		Expect(err).To(MatchError(splitgo.InvalidValue))
+		Expect(err).To(MatchError(webkit.InvalidValue))
 	})
 
 	It("lists friends but not group members", func(ctx SpecContext) {
@@ -51,7 +51,7 @@ var _ = Describe("friends", func() {
 		g, _ := Must2(model.GetOrCreateDirectGroup(ctx, db, alice.ID, bob.ID, "EUR"))
 
 		_, err := model.GetGroupByInviteCode(ctx, db, g.InviteCode)
-		Expect(err).To(MatchError(splitgo.NotFound))
+		Expect(err).To(MatchError(webkit.NotFound))
 	})
 
 	It("keeps ordinary groups ordinary", func(ctx SpecContext) {

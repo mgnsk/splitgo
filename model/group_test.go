@@ -1,8 +1,8 @@
 package model_test
 
 import (
-	"github.com/mgnsk/splitgo"
 	"github.com/mgnsk/splitgo/model"
+	"github.com/mgnsk/webkit"
 	. "github.com/mgnsk/webkit/testutil"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -37,7 +37,7 @@ var _ = Describe("groups", func() {
 
 		Expect(Must(model.GetUserGroup(ctx, db, alice.ID, g.ID)).Name).To(Equal("Trip"))
 		_, err := model.GetUserGroup(ctx, db, mallory.ID, g.ID)
-		Expect(err).To(MatchError(splitgo.NotFound))
+		Expect(err).To(MatchError(webkit.NotFound))
 	})
 
 	It("adds members idempotently and removes them", func(ctx SpecContext) {
@@ -75,6 +75,6 @@ var _ = Describe("groups", func() {
 		Expect(model.DeleteGroup(ctx, db, g.ID)).To(Succeed())
 		Expect(Must(model.ListUserExpenses(ctx, db, alice.ID, nil, 10))).To(BeEmpty())
 		_, err := model.GetGroup(ctx, db, g.ID)
-		Expect(err).To(MatchError(splitgo.NotFound))
+		Expect(err).To(MatchError(webkit.NotFound))
 	})
 })

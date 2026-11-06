@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/mgnsk/splitgo"
 	"github.com/mgnsk/splitgo/domain"
 	"github.com/mgnsk/splitgo/html"
 	"github.com/mgnsk/splitgo/model"
 	"github.com/mgnsk/splitgo/push"
+	"github.com/mgnsk/webkit"
 	"github.com/mgnsk/webkit/snowflake"
 	"github.com/samber/lo"
 )
@@ -43,10 +43,10 @@ type subscriptionJSON struct {
 func decodeSubscription(r *http.Request) subscriptionJSON {
 	var s subscriptionJSON
 	if err := json.NewDecoder(http.MaxBytesReader(nil, r.Body, 4096)).Decode(&s); err != nil {
-		panic(splitgo.InvalidValue.New("Invalid subscription", err))
+		panic(webkit.InvalidValue.New("Invalid subscription", err))
 	}
 	if !push.ValidEndpoint(s.Endpoint) {
-		panic(splitgo.InvalidValue.New("Unsupported push service"))
+		panic(webkit.InvalidValue.New("Unsupported push service"))
 	}
 	return s
 }
@@ -64,7 +64,7 @@ func (h *PushHandler) Subscribe(w http.ResponseWriter, r *http.Request) {
 	s := decodeSubscription(r)
 
 	if s.Keys.P256dh == "" || s.Keys.Auth == "" || len(s.Keys.P256dh) > 256 || len(s.Keys.Auth) > 256 {
-		panic(splitgo.InvalidValue.New("Invalid subscription keys"))
+		panic(webkit.InvalidValue.New("Invalid subscription keys"))
 	}
 
 	if err := model.SavePushSubscription(r.Context(), h.DB, &model.PushSubscription{

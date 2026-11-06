@@ -11,7 +11,9 @@ import (
 	"github.com/mgnsk/splitgo/model"
 	"github.com/mgnsk/splitgo/server"
 	"github.com/mgnsk/splitgo/split"
+	"github.com/mgnsk/webkit/session"
 	"github.com/mgnsk/webkit/snowflake"
+	"github.com/mgnsk/webkit/web"
 )
 
 // SettleHandler records payments between group members.
@@ -33,7 +35,7 @@ func (h *SettleHandler) Register(mux *http.ServeMux) {
 // Form renders the record payment form, prefilled from query parameters.
 func (h *SettleHandler) Form(w http.ResponseWriter, r *http.Request) {
 	me := mustUser(r)
-	req := decode[contract.GroupPath](r)
+	req := web.Decode[contract.GroupPath](r)
 	d := h.loadGroup(r.Context(), me, req.GroupID)
 	parties := h.settleParties(r.Context(), d)
 	q := r.URL.Query()
@@ -99,7 +101,7 @@ func (h *SettleHandler) settleParties(ctx context.Context, d html.GroupData) []*
 func (h *SettleHandler) Settle(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
-	req := decode[contract.SettleForm](r)
+	req := web.Decode[contract.SettleForm](r)
 	d := h.loadGroup(ctx, me, req.GroupID)
 
 	parties := h.settleParties(ctx, d)
@@ -135,6 +137,6 @@ func (h *SettleHandler) Settle(w http.ResponseWriter, r *http.Request) {
 
 	h.publishGroup(d.Group.ID, d.Members)
 
-	server.Flash(r, h.SM, "Payment recorded")
+	session.Flash(r.Context(), h.SM, "Payment recorded")
 	http.Redirect(w, r, d.LedgerURL(), http.StatusSeeOther)
 }

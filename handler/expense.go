@@ -6,13 +6,15 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/mgnsk/splitgo"
 	"github.com/mgnsk/splitgo/contract"
 	"github.com/mgnsk/splitgo/domain"
 	"github.com/mgnsk/splitgo/html"
 	"github.com/mgnsk/splitgo/model"
 	"github.com/mgnsk/splitgo/server"
+	"github.com/mgnsk/webkit"
+	"github.com/mgnsk/webkit/session"
 	"github.com/mgnsk/webkit/snowflake"
+	"github.com/mgnsk/webkit/web"
 )
 
 // ExpenseHandler handles expenses.
@@ -39,7 +41,7 @@ func (h *ExpenseHandler) Register(mux *http.ServeMux) {
 // New renders the add expense form.
 func (h *ExpenseHandler) New(w http.ResponseWriter, r *http.Request) {
 	me := mustUser(r)
-	req := decode[contract.GroupPath](r)
+	req := web.Decode[contract.GroupPath](r)
 	d := h.loadGroup(r.Context(), me, req.GroupID)
 
 	form := contract.NewExpenseForm(d.Group, me.ID, d.Members, h.userNow(me))
@@ -55,7 +57,7 @@ func (h *ExpenseHandler) New(w http.ResponseWriter, r *http.Request) {
 func (h *ExpenseHandler) Create(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
-	req := decode[contract.GroupPath](r)
+	req := web.Decode[contract.GroupPath](r)
 	d := h.loadGroup(ctx, me, req.GroupID)
 
 	form := parseForm(r)
@@ -81,7 +83,7 @@ func (h *ExpenseHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	h.publishGroup(d.Group.ID, d.Members)
 
-	server.Flash(r, h.SM, "Expense added")
+	session.Flash(r.Context(), h.SM, "Expense added")
 	http.Redirect(w, r, d.LedgerURL(), http.StatusSeeOther)
 }
 
@@ -89,7 +91,7 @@ func (h *ExpenseHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *ExpenseHandler) Split(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
-	req := decode[contract.GroupPath](r)
+	req := web.Decode[contract.GroupPath](r)
 	d := h.loadGroup(ctx, me, req.GroupID)
 
 	participants := d.Members
@@ -108,18 +110,18 @@ func (h *ExpenseHandler) Split(w http.ResponseWriter, r *http.Request) {
 	data := html.ExpenseFormData{GroupData: d, Participants: participants, Form: form}
 
 	if r.URL.Query().Get("part") == "preview" {
-		server.RenderPartial(w, html.SplitPreview(data))
+		web.Render(w, html.SplitPreview(data))
 		return
 	}
 
-	server.RenderPartial(w, html.SplitSection(data))
+	web.Render(w, html.SplitSection(data))
 }
 
 // Show renders an expense.
 func (h *ExpenseHandler) Show(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
-	req := decode[contract.ExpensePath](r)
+	req := web.Decode[contract.ExpensePath](r)
 	d := h.loadGroup(ctx, me, req.GroupID)
 	e := h.getExpense(ctx, d, req.ExpenseID)
 
@@ -132,7 +134,7 @@ func (h *ExpenseHandler) Show(w http.ResponseWriter, r *http.Request) {
 func (h *ExpenseHandler) Edit(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
-	req := decode[contract.ExpensePath](r)
+	req := web.Decode[contract.ExpensePath](r)
 	d := h.loadGroup(ctx, me, req.GroupID)
 	e := h.getEditableExpense(ctx, d, req.ExpenseID)
 
@@ -150,7 +152,7 @@ func (h *ExpenseHandler) Edit(w http.ResponseWriter, r *http.Request) {
 func (h *ExpenseHandler) Update(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
-	req := decode[contract.ExpensePath](r)
+	req := web.Decode[contract.ExpensePath](r)
 	d := h.loadGroup(ctx, me, req.GroupID)
 	e := h.getEditableExpense(ctx, d, req.ExpenseID)
 
@@ -180,7 +182,7 @@ func (h *ExpenseHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	h.publishGroup(d.Group.ID, d.Members)
 
-	server.Flash(r, h.SM, "Expense saved")
+	session.Flash(r.Context(), h.SM, "Expense saved")
 	http.Redirect(w, r, groupPath(d.Group.ID)+"/expenses/"+e.ID.String(), http.StatusSeeOther)
 }
 
@@ -188,7 +190,7 @@ func (h *ExpenseHandler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *ExpenseHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
-	req := decode[contract.ExpensePath](r)
+	req := web.Decode[contract.ExpensePath](r)
 	d := h.loadGroup(ctx, me, req.GroupID)
 	e := h.getExpense(ctx, d, req.ExpenseID)
 
@@ -205,8 +207,8 @@ func (h *ExpenseHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	h.publishGroup(d.Group.ID, d.Members)
 
-	server.Flash(r, h.SM, msg)
-	server.Redirect(w, r, d.LedgerURL())
+	session.Flash(r.Context(), h.SM, msg)
+	web.Redirect(w, r, d.LedgerURL())
 }
 
 func (h *ExpenseHandler) renderForm(w http.ResponseWriter, r *http.Request, data html.ExpenseFormData) {
@@ -220,8 +222,8 @@ func (h *ExpenseHandler) renderForm(w http.ResponseWriter, r *http.Request, data
 func (h *ExpenseHandler) getExpense(ctx context.Context, d html.GroupData, id snowflake.ID) *domain.Expense {
 	e, err := model.GetGroupExpense(ctx, h.DB, d.Group.ID, id)
 	if err != nil {
-		if errors.Is(err, splitgo.NotFound) {
-			panic(splitgo.NotFound.New("Expense not found"))
+		if errors.Is(err, webkit.NotFound) {
+			panic(webkit.NotFound.New("Expense not found"))
 		}
 		panic(err)
 	}
@@ -231,7 +233,7 @@ func (h *ExpenseHandler) getExpense(ctx context.Context, d html.GroupData, id sn
 func (h *ExpenseHandler) getEditableExpense(ctx context.Context, d html.GroupData, id snowflake.ID) *domain.Expense {
 	e := h.getExpense(ctx, d, id)
 	if e.Kind != domain.KindExpense {
-		panic(splitgo.InvalidValue.New("Payments can not be edited, delete and record it again"))
+		panic(webkit.InvalidValue.New("Payments can not be edited, delete and record it again"))
 	}
 	return e
 }
@@ -255,7 +257,7 @@ func (h *ExpenseHandler) expenseParticipants(ctx context.Context, d html.GroupDa
 
 func parseForm(r *http.Request) *contract.ExpenseForm {
 	if err := r.ParseForm(); err != nil {
-		panic(splitgo.InvalidValue.New("Invalid form", err))
+		panic(webkit.InvalidValue.New("Invalid form", err))
 	}
 	return contract.ParseExpenseForm(r.PostForm)
 }

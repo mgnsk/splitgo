@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/mgnsk/splitgo"
+	"github.com/mgnsk/webkit"
 	"github.com/mgnsk/webkit/snowflake"
 	"github.com/mgnsk/webkit/sqlite"
 	"github.com/samber/lo"
@@ -85,7 +85,7 @@ func GetOrCreateVAPIDKeys(ctx context.Context, db bun.IDB, generate func() (priv
 	if err == nil {
 		return keys, nil
 	}
-	if err = sqlite.NormalizeError(err); !errors.Is(err, splitgo.NotFound) {
+	if err = sqlite.NormalizeError(err); !errors.Is(err, webkit.NotFound) {
 		return nil, err
 	}
 

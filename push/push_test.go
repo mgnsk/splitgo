@@ -49,7 +49,7 @@ var _ = Describe("WebPush", func() {
 	BeforeEach(func(ctx SpecContext) {
 		db = sqlite.NewDB(":memory:").WithForeignKeys().Connect()
 		DeferCleanup(db.Close)
-		Expect(splitgo.MigrateUp(db.DB)).To(Succeed())
+		Expect(sqlite.MigrateUp(db.DB, splitgo.Migrations, "migrations")).To(Succeed())
 
 		user = &domain.User{ID: snowflake.Generate(), Email: "alice@example.com", Currency: "EUR"}
 		Expect(model.InsertUser(ctx, db, user)).To(Succeed())

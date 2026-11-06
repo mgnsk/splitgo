@@ -18,6 +18,7 @@ import (
 	"github.com/mgnsk/splitgo/model"
 	"github.com/mgnsk/splitgo/push"
 	"github.com/mgnsk/splitgo/server"
+	"github.com/mgnsk/webkit"
 	"github.com/mgnsk/webkit/app"
 	"github.com/mgnsk/webkit/sqlite"
 )
@@ -34,16 +35,16 @@ func main() {
 func run() error {
 	cfg, err := LoadConfig()
 	if err != nil {
-		return splitgo.Internal.New("error loading configuration", err)
+		return webkit.Internal.New("error loading configuration", err)
 	}
 
 	databaseDir, err := filepath.Abs(cfg.DatabaseDir)
 	if err != nil {
-		return splitgo.Internal.New("invalid database dir", err)
+		return webkit.Internal.New("invalid database dir", err)
 	}
 
 	if err := os.MkdirAll(databaseDir, 0o755); err != nil {
-		return splitgo.Internal.New("error creating database dir", err)
+		return webkit.Internal.New("error creating database dir", err)
 	}
 
 	db := sqlite.NewDB(filepath.Join(databaseDir, "splitgo.sqlite")).WithForeignKeys().Connect()
@@ -53,19 +54,19 @@ func run() error {
 		}
 	}()
 
-	if err := splitgo.MigrateUp(db.DB); err != nil {
-		return splitgo.Internal.New("error migrating database", err)
+	if err := sqlite.MigrateUp(db.DB, splitgo.Migrations, "migrations"); err != nil {
+		return webkit.Internal.New("error migrating database", err)
 	}
 
 	if err := sqlite.Optimize(context.Background(), db.DB); err != nil {
-		return splitgo.Internal.New("error optimizing database", err)
+		return webkit.Internal.New("error optimizing database", err)
 	}
 
 	var mailer mail.Sender = mail.LogSender{}
 	if cfg.SMTPURL != "" {
 		smtpSender, err := mail.NewSMTPSender(cfg.SMTPURL, cfg.MailFrom)
 		if err != nil {
-			return splitgo.Internal.New("error configuring SMTP", err)
+			return webkit.Internal.New("error configuring SMTP", err)
 		}
 		mailer = smtpSender
 	} else {
@@ -74,13 +75,13 @@ func run() error {
 
 	notifier, err := push.New(context.Background(), db, cfg.PushSubscriber())
 	if err != nil {
-		return splitgo.Internal.New("error configuring push notifications", err)
+		return webkit.Internal.New("error configuring push notifications", err)
 	}
 	defer notifier.Wait()
 
 	store, err := bunstore.New(db)
 	if err != nil {
-		return splitgo.Internal.New("error creating sqlite session store", err)
+		return webkit.Internal.New("error creating sqlite session store", err)
 	}
 
 	broker := live.NewBroker()

@@ -5,9 +5,8 @@ import (
 	"crypto/subtle"
 	"time"
 
-	"github.com/mgnsk/splitgo"
-
 	"github.com/mgnsk/splitgo/domain"
+	"github.com/mgnsk/webkit"
 	"github.com/mgnsk/webkit/sqlite"
 	"github.com/uptrace/bun"
 )
@@ -101,7 +100,7 @@ func ConsumeLoginCode(
 	}
 
 	if wrong {
-		return splitgo.InvalidValue.New("Wrong code")
+		return webkit.InvalidValue.New("Wrong code")
 	}
 
 	return nil

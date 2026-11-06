@@ -16,9 +16,9 @@ var _ = BeforeEach(func() {
 	db = sqlite.NewDB(":memory:").WithForeignKeys().Connect()
 	DeferCleanup(db.Close)
 
-	Expect(splitgo.MigrateUp(db.DB)).To(Succeed())
+	Expect(sqlite.MigrateUp(db.DB, splitgo.Migrations, "migrations")).To(Succeed())
 	DeferCleanup(func() error {
-		return splitgo.MigrateDown(db.DB)
+		return sqlite.MigrateDown(db.DB, splitgo.Migrations, "migrations")
 	})
 })
 

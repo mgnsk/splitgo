@@ -9,7 +9,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/mgnsk/splitgo"
 	"github.com/mgnsk/splitgo/contract"
 	"github.com/mgnsk/splitgo/domain"
 	"github.com/mgnsk/splitgo/html"
@@ -17,7 +16,10 @@ import (
 	"github.com/mgnsk/splitgo/model"
 	"github.com/mgnsk/splitgo/push"
 	"github.com/mgnsk/splitgo/server"
+	"github.com/mgnsk/webkit"
+	"github.com/mgnsk/webkit/session"
 	"github.com/mgnsk/webkit/snowflake"
+	"github.com/mgnsk/webkit/web"
 	hxhttp "maragu.dev/gomponents-htmx/http"
 )
 
@@ -57,7 +59,7 @@ func (h *GroupHandler) NewGroup(w http.ResponseWriter, r *http.Request) {
 // CreateGroup creates a group.
 func (h *GroupHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 	me := mustUser(r)
-	req := decode[contract.GroupForm](r)
+	req := web.Decode[contract.GroupForm](r)
 
 	if errs := req.Validate(); len(errs) > 0 {
 		server.RenderPage(w, r, h.SM, "New group", html.NewGroupMain(*req, errs))
@@ -76,7 +78,7 @@ func (h *GroupHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	server.Flash(r, h.SM, "Group created")
+	session.Flash(r.Context(), h.SM, "Group created")
 	http.Redirect(w, r, groupPath(group.ID), http.StatusSeeOther)
 }
 
@@ -85,7 +87,7 @@ func (h *GroupHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 func (h *GroupHandler) Show(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
-	req := decode[contract.GroupPage](r)
+	req := web.Decode[contract.GroupPage](r)
 	d := h.loadGroup(ctx, me, req.GroupID)
 
 	// Non-group expenses with a friend are shown on the friend page.
@@ -112,7 +114,7 @@ func (h *GroupHandler) Show(w http.ResponseWriter, r *http.Request) {
 	h.addPeople(ctx, d.People, expensePeopleIDs(expenses...))
 
 	if hxhttp.IsRequest(r.Header) && cursor != nil {
-		server.RenderPartial(w, html.ExpenseListPartial(d, expenses, more))
+		web.Render(w, html.ExpenseListPartial(d, expenses, more))
 		return
 	}
 
@@ -139,7 +141,7 @@ func (h *GroupHandler) Show(w http.ResponseWriter, r *http.Request) {
 func (h *GroupHandler) Settings(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
-	req := decode[contract.GroupPath](r)
+	req := web.Decode[contract.GroupPath](r)
 	d := h.loadOrdinaryGroup(ctx, me, req.GroupID)
 
 	h.renderSettings(w, r, d, contract.GroupForm{
@@ -220,7 +222,7 @@ func (h *GroupHandler) settledState(ctx context.Context, d html.GroupData) (me, 
 func (h *GroupHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
-	req := decode[contract.GroupForm](r)
+	req := web.Decode[contract.GroupForm](r)
 	d := h.loadOrdinaryGroup(ctx, me, req.GroupID)
 
 	if errs := req.Validate(); len(errs) > 0 {
@@ -239,7 +241,7 @@ func (h *GroupHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 
 	h.publishGroup(d.Group.ID, d.Members)
 
-	server.Flash(r, h.SM, "Group saved")
+	session.Flash(r.Context(), h.SM, "Group saved")
 	http.Redirect(w, r, groupPath(d.Group.ID)+"/settings", http.StatusSeeOther)
 }
 
@@ -248,7 +250,7 @@ func (h *GroupHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 func (h *GroupHandler) AddMember(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
-	req := decode[contract.AddMemberForm](r)
+	req := web.Decode[contract.AddMemberForm](r)
 	d := h.loadOrdinaryGroup(ctx, me, req.GroupID)
 
 	if errs := req.Validate(); len(errs) > 0 {
@@ -269,7 +271,7 @@ func (h *GroupHandler) AddMember(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, err := model.GetUserByEmail(ctx, h.DB, email)
-	if errors.Is(err, splitgo.NotFound) {
+	if errors.Is(err, webkit.NotFound) {
 		user = &domain.User{ID: snowflake.Generate(), Email: email, Currency: d.Group.Currency}
 		err = model.InsertUser(ctx, h.DB, user)
 	}
@@ -306,7 +308,7 @@ func (h *GroupHandler) AddMember(w http.ResponseWriter, r *http.Request) {
 
 	h.publishGroup(d.Group.ID, d.Members, []*domain.User{user})
 
-	server.Flash(r, h.SM, "Member added")
+	session.Flash(r.Context(), h.SM, "Member added")
 	http.Redirect(w, r, groupPath(d.Group.ID)+"/settings", http.StatusSeeOther)
 }
 
@@ -314,30 +316,30 @@ func (h *GroupHandler) AddMember(w http.ResponseWriter, r *http.Request) {
 func (h *GroupHandler) ResetInvite(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
-	req := decode[contract.GroupPath](r)
+	req := web.Decode[contract.GroupPath](r)
 	d := h.loadOrdinaryGroup(ctx, me, req.GroupID)
 
 	if err := model.SetGroupInviteCode(ctx, h.DB, d.Group.ID, randomToken(16)); err != nil {
 		panic(err)
 	}
 
-	server.Flash(r, h.SM, "Invite link reset")
-	server.Redirect(w, r, groupPath(d.Group.ID)+"/settings")
+	session.Flash(r.Context(), h.SM, "Invite link reset")
+	web.Redirect(w, r, groupPath(d.Group.ID)+"/settings")
 }
 
 // Leave removes the user from the group.
 func (h *GroupHandler) Leave(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
-	req := decode[contract.GroupPath](r)
+	req := web.Decode[contract.GroupPath](r)
 	d := h.loadOrdinaryGroup(ctx, me, req.GroupID)
 
 	if settled, _ := h.settledState(ctx, d); !settled {
-		panic(splitgo.PreconditionFailed.New("Settle up your balances before leaving the group"))
+		panic(webkit.PreconditionFailed.New("Settle up your balances before leaving the group"))
 	}
 
 	if len(d.Members) == 1 {
-		panic(splitgo.PreconditionFailed.New("You are the last member, delete the group instead"))
+		panic(webkit.PreconditionFailed.New("You are the last member, delete the group instead"))
 	}
 
 	if err := model.RemoveGroupMember(ctx, h.DB, d.Group.ID, me.ID); err != nil {
@@ -346,8 +348,8 @@ func (h *GroupHandler) Leave(w http.ResponseWriter, r *http.Request) {
 
 	h.publishGroup(d.Group.ID, d.Members)
 
-	server.Flash(r, h.SM, fmt.Sprintf("You left %s", d.Group.Name))
-	server.Redirect(w, r, "/")
+	session.Flash(r.Context(), h.SM, fmt.Sprintf("You left %s", d.Group.Name))
+	web.Redirect(w, r, "/")
 }
 
 // Delete deletes the group once everyone is settled up. Any member can do
@@ -355,11 +357,11 @@ func (h *GroupHandler) Leave(w http.ResponseWriter, r *http.Request) {
 func (h *GroupHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
-	req := decode[contract.GroupPath](r)
+	req := web.Decode[contract.GroupPath](r)
 	d := h.loadOrdinaryGroup(ctx, me, req.GroupID)
 
 	if _, all := h.settledState(ctx, d); !all {
-		panic(splitgo.PreconditionFailed.New("Everyone must be settled up before deleting the group"))
+		panic(webkit.PreconditionFailed.New("Everyone must be settled up before deleting the group"))
 	}
 
 	if err := model.DeleteGroup(ctx, h.DB, d.Group.ID); err != nil {
@@ -368,8 +370,8 @@ func (h *GroupHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	h.publishGroup(d.Group.ID, d.Members)
 
-	server.Flash(r, h.SM, fmt.Sprintf("Deleted %s", d.Group.Name))
-	server.Redirect(w, r, "/")
+	session.Flash(r.Context(), h.SM, fmt.Sprintf("Deleted %s", d.Group.Name))
+	web.Redirect(w, r, "/")
 }
 
 // JoinPage renders the join group confirmation.
@@ -398,17 +400,17 @@ func (h *GroupHandler) Join(w http.ResponseWriter, r *http.Request) {
 
 	h.publishGroup(group.ID, members)
 
-	server.Flash(r, h.SM, fmt.Sprintf("Welcome to %s", group.Name))
+	session.Flash(r.Context(), h.SM, fmt.Sprintf("Welcome to %s", group.Name))
 	http.Redirect(w, r, groupPath(group.ID), http.StatusSeeOther)
 }
 
 func (h *GroupHandler) groupByInvite(ctx context.Context, r *http.Request) (*domain.Group, []*domain.User) {
-	req := decode[contract.TokenPath](r)
+	req := web.Decode[contract.TokenPath](r)
 
 	group, err := model.GetGroupByInviteCode(ctx, h.DB, req.Token)
 	if err != nil {
-		if errors.Is(err, splitgo.NotFound) {
-			panic(splitgo.NotFound.New("Invite link is invalid"))
+		if errors.Is(err, webkit.NotFound) {
+			panic(webkit.NotFound.New("Invite link is invalid"))
 		}
 		panic(err)
 	}
