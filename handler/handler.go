@@ -15,16 +15,16 @@ import (
 	"time"
 
 	"github.com/alexedwards/scs/v2"
-	"github.com/ggicci/httpin"
 	"github.com/mgnsk/splitgo"
 	"github.com/mgnsk/splitgo/domain"
 	"github.com/mgnsk/splitgo/html"
 	"github.com/mgnsk/splitgo/live"
 	"github.com/mgnsk/splitgo/mail"
 	"github.com/mgnsk/splitgo/model"
-	"github.com/mgnsk/splitgo/pkg/snowflake"
 	"github.com/mgnsk/splitgo/push"
 	"github.com/mgnsk/splitgo/server"
+	"github.com/mgnsk/webkit/snowflake"
+	"github.com/mgnsk/webkit/web"
 	"github.com/uptrace/bun"
 )
 
@@ -90,11 +90,7 @@ func mustUser(r *http.Request) *domain.User {
 
 // decode decodes the request into a new V or panics.
 func decode[V any](r *http.Request) *V {
-	v := new(V)
-	if err := httpin.DecodeTo(r, v); err != nil {
-		panic(err)
-	}
-	return v
+	return web.Decode[V](r)
 }
 
 // loadGroup loads a group the user is a member of along with its members.

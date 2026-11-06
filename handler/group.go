@@ -15,9 +15,9 @@ import (
 	"github.com/mgnsk/splitgo/html"
 	"github.com/mgnsk/splitgo/mail"
 	"github.com/mgnsk/splitgo/model"
-	"github.com/mgnsk/splitgo/pkg/snowflake"
 	"github.com/mgnsk/splitgo/push"
 	"github.com/mgnsk/splitgo/server"
+	"github.com/mgnsk/webkit/snowflake"
 	hxhttp "maragu.dev/gomponents-htmx/http"
 )
 

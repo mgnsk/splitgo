@@ -5,8 +5,8 @@ import (
 	"context"
 
 	"github.com/mgnsk/splitgo/domain"
-	"github.com/mgnsk/splitgo/pkg/snowflake"
-	"github.com/mgnsk/splitgo/pkg/sqlite"
+	"github.com/mgnsk/webkit/snowflake"
+	"github.com/mgnsk/webkit/sqlite"
 	"github.com/samber/lo"
 	"github.com/uptrace/bun"
 )

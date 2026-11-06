@@ -8,7 +8,7 @@ import (
 	"github.com/mgnsk/splitgo"
 
 	"github.com/mgnsk/splitgo/domain"
-	"github.com/mgnsk/splitgo/pkg/sqlite"
+	"github.com/mgnsk/webkit/sqlite"
 	"github.com/uptrace/bun"
 )
 

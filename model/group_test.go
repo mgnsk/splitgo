@@ -3,7 +3,7 @@ package model_test
 import (
 	"github.com/mgnsk/splitgo"
 	"github.com/mgnsk/splitgo/model"
-	. "github.com/mgnsk/splitgo/pkg/testing"
+	. "github.com/mgnsk/webkit/testutil"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

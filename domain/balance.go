@@ -2,7 +2,7 @@ package domain
 
 import (
 	"github.com/mgnsk/splitgo/balance"
-	"github.com/mgnsk/splitgo/pkg/snowflake"
+	"github.com/mgnsk/webkit/snowflake"
 )
 
 // Debt means From owes To Amount minor units of Currency.

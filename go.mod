@@ -6,22 +6,26 @@ require (
 	github.com/SherClockHolmes/webpush-go v1.4.0
 	github.com/alexedwards/scs/bunstore v0.0.0-20250205215704-2e2c681ccff8
 	github.com/alexedwards/scs/v2 v2.9.0
-	github.com/bwmarrin/snowflake v0.3.0
-	github.com/ggicci/httpin v0.20.5
-	github.com/golang-migrate/migrate/v4 v4.20.1
-	github.com/mgnsk/wreck v0.0.0-20250814111550-d27b8a6e5d5b
+	github.com/mgnsk/webkit v0.0.0
 	github.com/onsi/ginkgo/v2 v2.33.1
 	github.com/onsi/gomega v1.44.0
 	github.com/samber/lo v1.53.0
-	github.com/samber/slog-http v1.12.1
 	github.com/shopspring/decimal v1.6.0
 	github.com/uptrace/bun v1.3.0
-	github.com/uptrace/bun/dialect/sqlitedialect v1.3.0
-	github.com/uptrace/bun/extra/bundebug v1.3.0
-	golang.org/x/sync v0.24.0
 	maragu.dev/gomponents v1.4.0
 	maragu.dev/gomponents-htmx v0.6.1
-	modernc.org/sqlite v1.61.0
+)
+
+require (
+	github.com/bwmarrin/snowflake v0.3.0 // indirect
+	github.com/ggicci/httpin v0.20.5 // indirect
+	github.com/golang-migrate/migrate/v4 v4.20.1 // indirect
+	github.com/mgnsk/wreck v0.0.0-20250814111550-d27b8a6e5d5b // indirect
+	github.com/samber/slog-http v1.12.1 // indirect
+	github.com/uptrace/bun/dialect/sqlitedialect v1.3.0 // indirect
+	github.com/uptrace/bun/extra/bundebug v1.3.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
+	modernc.org/sqlite v1.61.0 // indirect
 )
 
 require (
@@ -88,3 +92,5 @@ tool (
 	github.com/air-verse/air
 	github.com/mgechev/revive
 )
+
+replace github.com/mgnsk/webkit => ./webkit

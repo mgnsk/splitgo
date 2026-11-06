@@ -9,9 +9,9 @@ import (
 	"github.com/mgnsk/splitgo/domain"
 	"github.com/mgnsk/splitgo/html"
 	"github.com/mgnsk/splitgo/model"
-	"github.com/mgnsk/splitgo/pkg/snowflake"
 	"github.com/mgnsk/splitgo/server"
 	"github.com/mgnsk/splitgo/split"
+	"github.com/mgnsk/webkit/snowflake"
 )
 
 // SettleHandler records payments between group members.

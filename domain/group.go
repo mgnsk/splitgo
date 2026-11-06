@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"github.com/mgnsk/splitgo/pkg/snowflake"
+	"github.com/mgnsk/webkit/snowflake"
 )
 
 // GroupKind tells ordinary groups from the hidden groups of two friends.
