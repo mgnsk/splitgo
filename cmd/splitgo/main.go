@@ -57,6 +57,10 @@ func run() error {
 		return splitgo.Internal.New("error migrating database", err)
 	}
 
+	if err := sqlite.Optimize(context.Background(), db.DB); err != nil {
+		return splitgo.Internal.New("error optimizing database", err)
+	}
+
 	var mailer mail.Sender = mail.LogSender{}
 	if cfg.SMTPURL != "" {
 		smtpSender, err := mail.NewSMTPSender(cfg.SMTPURL, cfg.MailFrom)
@@ -106,12 +110,9 @@ func run() error {
 
 	return app.Run(context.Background(), s,
 		// Run SQL optimizer periodic task.
-		func(ctx context.Context) error {
-			if err := sqlite.RunOptimizer(ctx, db.DB); err != nil {
-				return splitgo.Internal.New("error running sqlite optimizer", err)
-			}
-			return nil
-		},
+		app.Every(24*time.Hour, func(ctx context.Context, _ time.Time) error {
+			return sqlite.Optimize(ctx, db.DB)
+		}),
 		// Run expired login tokens and old invites cleanup periodic task.
 		app.Every(5*time.Minute, func(ctx context.Context, now time.Time) error {
 			if err := model.DeleteExpiredLoginTokens(ctx, db, now); err != nil {
