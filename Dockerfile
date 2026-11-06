@@ -3,8 +3,6 @@ FROM golang:1.26-bookworm AS build
 WORKDIR /build
 
 COPY go.mod go.sum ./
-# Unpublished framework module, see the replace directive in go.mod.
-COPY webkit/go.mod webkit/go.sum ./webkit/
 RUN go mod download
 
 COPY . .
