@@ -21,7 +21,7 @@ import (
 	"github.com/mgnsk/splitgo/live"
 	"github.com/mgnsk/splitgo/mail"
 	"github.com/mgnsk/splitgo/model"
-	"github.com/mgnsk/splitgo/push"
+	"github.com/mgnsk/webkit/push"
 	"github.com/mgnsk/splitgo/server"
 	"github.com/mgnsk/webkit"
 	"github.com/mgnsk/webkit/session"
@@ -49,7 +49,10 @@ type Deps struct {
 	DB     *bun.DB
 	SM     *scs.SessionManager
 	Mailer mail.Sender
-	Push   push.Notifier
+	// Push serves the push subscription endpoints.
+	Push *push.Service[snowflake.ID]
+	// Notifier sends push notifications.
+	Notifier push.Notifier[snowflake.ID]
 	Live   *live.Broker
 	Config Config
 }
@@ -213,13 +216,18 @@ func New(deps *Deps) http.Handler {
 			ToastTarget: "#toast",
 		},
 	},
-		splitgo.RegisterAssetsHandler,
+		splitgo.Assets.Register,
+		splitgo.PWA.Register,
 		NewAuthHandler(deps).Register,
 		NewHomeHandler(deps).Register,
 		NewGroupHandler(deps).Register,
 		NewExpenseHandler(deps).Register,
 		NewSettleHandler(deps).Register,
-		NewPushHandler(deps).Register,
+		func(mux *http.ServeMux) {
+			deps.Push.Register(mux, func(r *http.Request) snowflake.ID {
+				return mustUser(r).ID
+			}, deps.middlewares(true)...)
+		},
 		NewEventsHandler(deps).Register,
 		NewFriendHandler(deps).Register,
 	)

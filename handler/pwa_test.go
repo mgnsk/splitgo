@@ -115,14 +115,14 @@ var _ = Describe("PWA", func() {
 
 	It("links the manifest and icons", func() {
 		body := c.get("/login").body
-		Expect(body).To(MatchRegexp(`<link rel="manifest" href="/assets/manifest.webmanifest\?crc=\d+">`))
+		Expect(body).To(MatchRegexp(`<link rel="manifest" href="/manifest.webmanifest\?crc=\d+">`))
 		Expect(body).To(ContainSubstring(`rel="apple-touch-icon"`))
 		Expect(body).To(ContainSubstring(`name="theme-color"`))
 		Expect(body).To(MatchRegexp(`<script defer src="/assets/app.js\?crc=\d+">`))
 	})
 
 	It("serves a valid manifest", func() {
-		resp := c.get("/assets/manifest.webmanifest")
+		resp := c.get("/manifest.webmanifest")
 		Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		Expect(resp.Header.Get("Content-Type")).To(Equal("application/manifest+json"))
 

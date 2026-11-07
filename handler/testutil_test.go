@@ -19,6 +19,7 @@ import (
 	"github.com/mgnsk/splitgo/mail"
 	"github.com/mgnsk/splitgo/model"
 	"github.com/mgnsk/splitgo/server"
+	"github.com/mgnsk/webkit/push"
 	"github.com/mgnsk/webkit/snowflake"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -84,6 +85,7 @@ type testEnv struct {
 	ts       *httptest.Server
 	mailer   *fakeMailer
 	notifier *fakeNotifier
+	push     *push.Service[snowflake.ID]
 	live     *live.Broker
 	clock    *testClock
 }
@@ -92,7 +94,11 @@ func newTestEnv(allowSignup bool) *testEnv {
 	store, err := bunstore.NewWithCleanupInterval(db, 0)
 	Expect(err).NotTo(HaveOccurred())
 
+	pushService, err := push.New[snowflake.ID](context.Background(), db, push.Options{})
+	Expect(err).NotTo(HaveOccurred())
+
 	env := &testEnv{
+		push:     pushService,
 		mailer:   &fakeMailer{},
 		notifier: &fakeNotifier{},
 		live:     live.NewBroker(),
@@ -103,7 +109,8 @@ func newTestEnv(allowSignup bool) *testEnv {
 		DB:     db,
 		SM:     server.NewSessionManager(store, true),
 		Mailer: env.mailer,
-		Push:   env.notifier,
+		Push:     env.push,
+		Notifier: env.notifier,
 		Live:   env.live,
 		Config: handler.Config{
 			BaseURL:     "https://splitgo.test",

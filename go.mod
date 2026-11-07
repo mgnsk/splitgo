@@ -3,7 +3,6 @@ module github.com/mgnsk/splitgo
 go 1.26.0
 
 require (
-	github.com/SherClockHolmes/webpush-go v1.4.0
 	github.com/alexedwards/scs/bunstore v0.0.0-20251002162104-209de6e426de
 	github.com/alexedwards/scs/v2 v2.9.0
 	github.com/mgnsk/webkit v0.0.1
@@ -33,6 +32,7 @@ require (
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/Masterminds/semver/v3 v3.5.0 // indirect
+	github.com/SherClockHolmes/webpush-go v1.4.0 // indirect
 	github.com/air-verse/air v1.67.4 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/bep/godartsass/v2 v2.5.0 // indirect
@@ -94,3 +94,5 @@ tool (
 	github.com/air-verse/air
 	github.com/mgechev/revive
 )
+
+replace github.com/mgnsk/webkit => ./webkit
