@@ -14,7 +14,7 @@ import (
 	"github.com/mgnsk/splitgo/live"
 	"github.com/mgnsk/splitgo/mail"
 	"github.com/mgnsk/splitgo/model"
-	"github.com/mgnsk/splitgo/push"
+	"github.com/mgnsk/webkit/push"
 	"github.com/mgnsk/splitgo/server"
 	"github.com/mgnsk/webkit"
 	"github.com/mgnsk/webkit/session"
@@ -118,7 +118,7 @@ func (h *FriendHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	h.recordInvite(ctx, me)
 
-	h.Push.Notify(ctx, []snowflake.ID{friend.ID}, push.Message{
+	h.Notifier.Notify(ctx, []snowflake.ID{friend.ID}, push.Message{
 		Title: "splitgo",
 		Body:  fmt.Sprintf("%s added you as a friend", me.DisplayName()),
 		URL:   html.FriendURL(me.ID),

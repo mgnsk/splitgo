@@ -8,8 +8,7 @@ import (
 	"sync"
 
 	"github.com/mgnsk/splitgo/domain"
-	"github.com/mgnsk/splitgo/model"
-	"github.com/mgnsk/splitgo/push"
+	"github.com/mgnsk/webkit/push"
 	"github.com/mgnsk/webkit/snowflake"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -33,10 +32,6 @@ func (n *fakeNotifier) Notify(_ context.Context, userIDs []snowflake.ID, msg pus
 	for _, id := range userIDs {
 		n.sent = append(n.sent, sentPush{UserID: id, Message: msg})
 	}
-}
-
-func (*fakeNotifier) PublicKey() string {
-	return "test-vapid-key"
 }
 
 func (n *fakeNotifier) to(id snowflake.ID) []push.Message {
@@ -65,9 +60,9 @@ func subscriptionBody(endpoint string) string {
 	return `{"endpoint":"` + endpoint + `","keys":{"p256dh":"BNcR","auth":"tBHI"}}`
 }
 
-func listSubs(ctx context.Context, ids ...snowflake.ID) []*model.PushSubscription {
+func (env *testEnv) listSubs(ctx context.Context, ids ...snowflake.ID) []*push.Subscription[snowflake.ID] {
 	GinkgoHelper()
-	subs, err := model.ListPushSubscriptions(ctx, db, ids)
+	subs, err := env.push.Subscriptions(ctx, ids...)
 	Expect(err).NotTo(HaveOccurred())
 	return subs
 }
@@ -97,9 +92,9 @@ var _ = Describe("push notifications", func() {
 		bobU = bob.login("bob@example.com")
 	}
 
-	It("shows the notification settings with the VAPID key", func() {
+	It("shows the notification settings", func() {
 		body := alice.get("/account").body
-		Expect(body).To(ContainSubstring(`data-vapid-key="test-vapid-key"`))
+		Expect(body).To(ContainSubstring(`id="push"`))
 		Expect(body).To(ContainSubstring("Add to Home Screen"))
 	})
 
@@ -113,30 +108,30 @@ var _ = Describe("push notifications", func() {
 	It("serves the VAPID key to signed in users", func() {
 		resp := alice.get("/push/key")
 		Expect(resp.StatusCode).To(Equal(http.StatusOK))
-		Expect(resp.body).To(Equal("test-vapid-key"))
-		Expect(env.newClient().get("/push/key").body).NotTo(Equal("test-vapid-key"))
+		Expect(resp.body).To(Equal(env.push.PublicKey()))
+		Expect(env.newClient().get("/push/key").body).NotTo(Equal(env.push.PublicKey()))
 	})
 
 	It("stores, moves and deletes subscriptions", func(ctx SpecContext) {
 		addBob()
 
 		Expect(alice.postJSON("/push/subscribe", subscriptionBody(appleEndpoint)).StatusCode).To(Equal(http.StatusNoContent))
-		subs := listSubs(ctx, aliceU.ID)
+		subs := env.listSubs(ctx, aliceU.ID)
 		Expect(subs).To(HaveLen(1))
 		Expect(subs[0].Endpoint).To(Equal(appleEndpoint))
 		Expect(subs[0].P256dh).To(Equal("BNcR"))
 
 		// Bob can not remove Alice's subscription.
 		Expect(bob.postJSON("/push/unsubscribe", subscriptionBody(appleEndpoint)).StatusCode).To(Equal(http.StatusNoContent))
-		Expect(listSubs(ctx, aliceU.ID)).To(HaveLen(1))
+		Expect(env.listSubs(ctx, aliceU.ID)).To(HaveLen(1))
 
 		// The same device signed in as Bob now notifies Bob only.
 		Expect(bob.postJSON("/push/subscribe", subscriptionBody(appleEndpoint)).StatusCode).To(Equal(http.StatusNoContent))
-		Expect(listSubs(ctx, aliceU.ID)).To(BeEmpty())
-		Expect(listSubs(ctx, bobU.ID)).To(HaveLen(1))
+		Expect(env.listSubs(ctx, aliceU.ID)).To(BeEmpty())
+		Expect(env.listSubs(ctx, bobU.ID)).To(HaveLen(1))
 
 		Expect(bob.postJSON("/push/unsubscribe", subscriptionBody(appleEndpoint)).StatusCode).To(Equal(http.StatusNoContent))
-		Expect(listSubs(ctx, bobU.ID)).To(BeEmpty())
+		Expect(env.listSubs(ctx, bobU.ID)).To(BeEmpty())
 	})
 
 	It("rejects endpoints of unknown push services", func(ctx SpecContext) {
@@ -150,7 +145,7 @@ var _ = Describe("push notifications", func() {
 			Expect(resp.StatusCode).To(Equal(http.StatusBadRequest), endpoint)
 		}
 		Expect(alice.postJSON("/push/subscribe", `{"endpoint":"`+appleEndpoint+`"}`).StatusCode).To(Equal(http.StatusBadRequest))
-		Expect(listSubs(ctx, aliceU.ID)).To(BeEmpty())
+		Expect(env.listSubs(ctx, aliceU.ID)).To(BeEmpty())
 	})
 
 	It("requires signing in", func() {

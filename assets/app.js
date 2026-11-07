@@ -1,78 +1,25 @@
-// Register the service worker that shows an offline page when the network is
-// down and displays push notifications.
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/sw.js").catch(() => {});
-}
-
-// Running as the installed app rather than in a browser tab.
-const standalone =
-  window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
-
-const pushSupported =
-  "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
-
-// The installed app on iOS only gets PushManager when opened from the Home
-// Screen, so this is false in a Safari tab.
-async function currentSubscription() {
-  if (!pushSupported) {
-    return null;
-  }
-  const reg = await navigator.serviceWorker.ready;
-  return reg.pushManager.getSubscription();
-}
-
-function postSubscription(path, sub) {
-  return fetch(path, {
-    method: "POST",
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(sub),
-  }).then((resp) => {
-    if (!resp.ok) {
-      throw new Error(`${path}: ${resp.status}`);
-    }
-  });
-}
-
-function base64UrlToBytes(s) {
-  const b64 = (s + "=".repeat((4 - (s.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/");
-  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-}
-
-// subscribePush asks for permission and subscribes this device. On iOS it
-// must be called directly in a tap handler, before any other await.
-async function subscribePush(reg, vapidKey) {
-  const sub = await reg.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: base64UrlToBytes(vapidKey),
-  });
-  try {
-    await postSubscription("/push/subscribe", sub);
-  } catch (err) {
-    await sub.unsubscribe();
-    throw err;
-  }
-}
+// The service worker, notification taps and the push API come from pwa.js,
+// which is loaded before this script.
+const { pwa, push } = window.webkit;
 
 // Notification settings on the account page.
 async function initPushCard(card) {
   const status = card.querySelector("[data-push-status]");
   const button = card.querySelector("[data-push-toggle]");
-  if (!pushSupported) {
+
+  // Get the device before any click so that subscribe() runs directly in
+  // the tap handler: iOS only allows the permission prompt there.
+  const device = await push.device();
+  if (!device) {
     return; // The server-rendered text explains how to get support.
   }
 
-  // Get the registration before any click so that subscribe() runs directly
-  // in the tap handler: iOS only allows the permission prompt there.
-  const reg = await navigator.serviceWorker.ready;
-
   const render = async () => {
-    const sub = await reg.pushManager.getSubscription();
     if (Notification.permission === "denied") {
       status.textContent =
         "Notifications are blocked for splitgo. Allow them in your device or browser settings.";
       button.hidden = true;
-    } else if (sub) {
+    } else if (await device.subscribed()) {
       status.textContent = "Notifications are on for this device.";
       button.textContent = "Turn off";
       button.hidden = false;
@@ -86,12 +33,10 @@ async function initPushCard(card) {
   button.addEventListener("click", async () => {
     button.disabled = true;
     try {
-      const sub = await reg.pushManager.getSubscription();
-      if (sub) {
-        await postSubscription("/push/unsubscribe", sub).catch(() => {});
-        await sub.unsubscribe();
+      if (await device.subscribed()) {
+        await device.unsubscribe();
       } else {
-        await subscribePush(reg, card.dataset.vapidKey);
+        await device.subscribe();
       }
     } catch (err) {
       console.error(err);
@@ -113,21 +58,16 @@ async function initPushCard(card) {
 const promptDismissedKey = "push-prompt-dismissed";
 
 async function initPushPrompt(prompt) {
-  if (!pushSupported || !standalone || localStorage.getItem(promptDismissedKey)) {
+  if (!push.supported || !pwa.standalone || localStorage.getItem(promptDismissedKey)) {
     return;
   }
   if (Notification.permission !== "default") {
     return; // Already decided.
   }
-  const reg = await navigator.serviceWorker.ready;
-  if (await reg.pushManager.getSubscription()) {
+  const device = await push.device();
+  if (!device || (await device.subscribed())) {
     return;
   }
-  const resp = await fetch("/push/key", { credentials: "same-origin" });
-  if (!resp.ok) {
-    return;
-  }
-  const vapidKey = (await resp.text()).trim();
 
   const close = () => {
     localStorage.setItem(promptDismissedKey, "1");
@@ -139,7 +79,7 @@ async function initPushPrompt(prompt) {
   enable.addEventListener("click", async () => {
     enable.disabled = true;
     try {
-      await subscribePush(reg, vapidKey);
+      await device.subscribe();
       close();
     } catch (err) {
       console.error(err);
@@ -156,39 +96,15 @@ async function initPushPrompt(prompt) {
   prompt.hidden = false;
 }
 
-// Keep the server's copy of this device's subscription current, e.g. after
-// signing in as another user or when the browser rotated the subscription.
-async function syncSubscription() {
-  if (!document.querySelector(".topbar .nav") || sessionStorage.getItem("push-synced")) {
-    return;
-  }
-  const sub = await currentSubscription();
-  if (sub && Notification.permission === "granted") {
-    await postSubscription("/push/subscribe", sub);
-  }
-  sessionStorage.setItem("push-synced", "1");
-}
-
 // Stop notifications for this device when signing out.
 document.addEventListener("submit", async (event) => {
   const form = event.target;
-  if (!pushSupported || !(form instanceof HTMLFormElement) || form.getAttribute("action") !== "/logout") {
+  if (!push.supported || !(form instanceof HTMLFormElement) || form.getAttribute("action") !== "/logout") {
     return;
   }
   // Cancel synchronously, the subscription lookup is async.
   event.preventDefault();
-  try {
-    // serviceWorker.ready never resolves without a service worker.
-    const timeout = new Promise((resolve) => setTimeout(resolve, 3000, null));
-    const sub = await Promise.race([currentSubscription(), timeout]);
-    if (sub) {
-      await postSubscription("/push/unsubscribe", sub);
-      await sub.unsubscribe();
-    }
-  } catch (err) {
-    console.error(err);
-  }
-  sessionStorage.removeItem("push-synced");
+  await push.unsubscribe().catch(console.error);
   form.submit();
 });
 
@@ -201,7 +117,10 @@ document.addEventListener("DOMContentLoaded", () => {
   if (card) {
     initPushCard(card).catch(console.error);
   }
-  syncSubscription().catch(console.error);
+  // Signed in: keep the server's copy of this device's subscription current.
+  if (document.querySelector(".topbar .nav")) {
+    push.sync().catch(console.error);
+  }
 });
 
 // Reload the installed app when it comes back to the foreground so balances
@@ -215,34 +134,19 @@ document.addEventListener("input", (event) => {
 });
 
 let hiddenAt = 0;
-let navigating = false;
 
 function refreshIfStale() {
-  if (!standalone || formDirty || hiddenAt === 0) {
+  if (!pwa.standalone || formDirty || hiddenAt === 0) {
     return;
   }
   hiddenAt = 0;
   // Wait briefly: when the app was brought up by tapping a notification, the
   // service worker's navigate message follows and takes precedence.
   setTimeout(() => {
-    if (!navigating) {
+    if (!pwa.navigating) {
       window.location.reload();
     }
   }, 300);
-}
-
-// Tapping a notification while the app is open: go to its page. Assigning
-// the current URL reloads it, so the view is fresh either way.
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.addEventListener("message", (event) => {
-    const data = event.data;
-    if (!data || data.type !== "navigate" || typeof data.url !== "string" || !data.url.startsWith("/") || data.url.startsWith("//")) {
-      return;
-    }
-    navigating = true;
-    window.location.assign(data.url);
-  });
-  navigator.serviceWorker.startMessages();
 }
 
 document.addEventListener("visibilitychange", () => {
@@ -275,7 +179,7 @@ let liveTimer = 0;
 let livePending = false;
 
 function liveRefresh() {
-  if (submitting || navigating || formDirty) {
+  if (submitting || pwa.navigating || formDirty) {
     return;
   }
   if (document.visibilityState !== "visible") {
@@ -285,7 +189,7 @@ function liveRefresh() {
   // Coalesce bursts of changes into one refresh.
   clearTimeout(liveTimer);
   liveTimer = setTimeout(() => {
-    if (submitting || navigating || formDirty) {
+    if (submitting || pwa.navigating || formDirty) {
       return;
     }
     const url = window.location.pathname + window.location.search;

@@ -43,7 +43,7 @@ func Page(props PageProps) Node {
 			),
 			Meta(Name("htmx-config"), Content(htmxConfig)),
 			Link(Rel("icon"), Type("image/svg+xml"), Href(splitgo.Assets.Path("favicon.svg"))),
-			Link(Rel("manifest"), Href(splitgo.Assets.Path("manifest.webmanifest"))),
+			Link(Rel("manifest"), Href(splitgo.PWA.ManifestPath())),
 			Link(Rel("apple-touch-icon"), Href(splitgo.Assets.Path("icons/apple-touch-icon.png"))),
 			Meta(Name("mobile-web-app-capable"), Content("yes")),
 			Meta(Name("apple-mobile-web-app-capable"), Content("yes")),
@@ -52,6 +52,7 @@ func Page(props PageProps) Node {
 			themeColor(props.User),
 			Link(Rel("stylesheet"), Href(splitgo.Assets.Path("app.css"))),
 			Script(Defer(), Src(splitgo.Assets.Path("htmx.min.js"))),
+			Script(Defer(), Src(splitgo.PWA.ScriptPath())),
 			Script(Defer(), Src(splitgo.Assets.Path("app.js"))),
 		},
 		Body: []Node{

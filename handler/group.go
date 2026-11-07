@@ -14,7 +14,7 @@ import (
 	"github.com/mgnsk/splitgo/html"
 	"github.com/mgnsk/splitgo/mail"
 	"github.com/mgnsk/splitgo/model"
-	"github.com/mgnsk/splitgo/push"
+	"github.com/mgnsk/webkit/push"
 	"github.com/mgnsk/splitgo/server"
 	"github.com/mgnsk/webkit"
 	"github.com/mgnsk/webkit/session"
@@ -300,7 +300,7 @@ func (h *GroupHandler) AddMember(w http.ResponseWriter, r *http.Request) {
 	}
 	h.recordInvite(ctx, me)
 
-	h.Push.Notify(ctx, []snowflake.ID{user.ID}, push.Message{
+	h.Notifier.Notify(ctx, []snowflake.ID{user.ID}, push.Message{
 		Title: d.Group.Name,
 		Body:  fmt.Sprintf("%s added you to %s", me.DisplayName(), d.Group.Name),
 		URL:   groupPath(d.Group.ID),

@@ -16,10 +16,11 @@ import (
 	"github.com/mgnsk/splitgo/live"
 	"github.com/mgnsk/splitgo/mail"
 	"github.com/mgnsk/splitgo/model"
-	"github.com/mgnsk/splitgo/push"
-	"github.com/mgnsk/splitgo/server"
+		"github.com/mgnsk/splitgo/server"
 	"github.com/mgnsk/webkit"
 	"github.com/mgnsk/webkit/app"
+	"github.com/mgnsk/webkit/push"
+	"github.com/mgnsk/webkit/snowflake"
 	"github.com/mgnsk/webkit/sqlite"
 )
 
@@ -73,7 +74,9 @@ func run() error {
 		slog.Warn("SMTP_URL not set: sign-in links are logged instead of emailed")
 	}
 
-	notifier, err := push.New(context.Background(), db, cfg.PushSubscriber())
+	notifier, err := push.New[snowflake.ID](context.Background(), db, push.Options{
+		Subscriber: cfg.PushSubscriber(),
+	})
 	if err != nil {
 		return webkit.Internal.New("error configuring push notifications", err)
 	}
@@ -90,7 +93,8 @@ func run() error {
 		DB:     db,
 		SM:     server.NewSessionManager(store, cfg.SecureCookies()),
 		Mailer: mailer,
-		Push:   notifier,
+		Push:     notifier,
+		Notifier: notifier,
 		Live:   broker,
 		Config: handler.Config{
 			BaseURL:     cfg.BaseURL,
