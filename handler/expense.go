@@ -44,7 +44,7 @@ func (h *ExpenseHandler) New(w http.ResponseWriter, r *http.Request) {
 	req := web.Decode[contract.GroupPath](r)
 	d := h.loadGroup(r.Context(), me, req.GroupID)
 
-	form := contract.NewExpenseForm(d.Group, me.ID, d.Members, h.userNow(me))
+	form := contract.NewExpenseForm(d.Group, me.ID, h.userNow(me))
 
 	h.renderForm(w, r, html.ExpenseFormData{
 		GroupData:    d,

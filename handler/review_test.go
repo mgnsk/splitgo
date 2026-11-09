@@ -104,8 +104,8 @@ var _ = Describe("group invites, notifications and friend removal", func() {
 
 		resp := alice.post(path, url.Values{
 			"description": {"Taxi"}, "amount": {"10"}, "currency": {"EUR"}, "date": {"2026-11-03"},
-			"mode": {"advanced"}, "split_type": {"equal"},
-			"paid_by": {aliceU.ID.String()}, "included": {aliceU.ID.String()},
+			"mode": {"advanced"}, "split_type": {"shares"},
+			"paid_by": {aliceU.ID.String()}, "value_" + aliceU.ID.String(): {"1"},
 		}, false)
 		Expect(resp.StatusCode).To(Equal(http.StatusSeeOther))
 

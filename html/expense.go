@@ -2,7 +2,10 @@ package html
 
 import (
 	"fmt"
+	"maps"
 	"net/url"
+	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/mgnsk/splitgo/contract"
@@ -11,6 +14,7 @@ import (
 	"github.com/mgnsk/splitgo/money"
 	"github.com/mgnsk/webkit/snowflake"
 	"github.com/mgnsk/splitgo/split"
+	"github.com/shopspring/decimal"
 	. "maragu.dev/gomponents"
 	hx "maragu.dev/gomponents-htmx"
 	. "maragu.dev/gomponents/html"
@@ -103,6 +107,7 @@ func ExpenseFormMain(d ExpenseFormData) Node {
 
 // SplitSection renders the split controls for the current mode.
 func SplitSection(d ExpenseFormData) Node {
+	d = withEvenPercentages(d)
 	f := d.Form
 
 	switchButton := func(to, text string) Node {
@@ -164,6 +169,27 @@ func SplitSection(d ExpenseFormData) Node {
 	)
 }
 
+// withEvenPercentages starts an empty two-person percentage split at 50/50
+// so that the slider, the inputs and the preview agree.
+func withEvenPercentages(d ExpenseFormData) ExpenseFormData {
+	f := d.Form
+	if f.Mode == contract.ModeSimple || f.SplitType != split.Percentage || len(d.Participants) != 2 {
+		return d
+	}
+	a, b := d.Participants[0].ID, d.Participants[1].ID
+	if f.Values[a] != "" || f.Values[b] != "" {
+		return d
+	}
+	nf := *f
+	nf.Values = maps.Clone(f.Values)
+	if nf.Values == nil {
+		nf.Values = map[snowflake.ID]string{}
+	}
+	nf.Values[a], nf.Values[b] = "50", "50"
+	d.Form = &nf
+	return d
+}
+
 func payerSelect(d ExpenseFormData, label string, after Node) Node {
 	var opts []components.SelectOption
 	for _, p := range d.Participants {
@@ -194,7 +220,7 @@ func payerSelect(d ExpenseFormData, label string, after Node) Node {
 
 func splitTypeOptions() []components.SelectOption {
 	var opts []components.SelectOption
-	for _, t := range split.Types {
+	for _, t := range split.AdvancedTypes {
 		opts = append(opts, components.SelectOption{Value: string(t), Label: t.Label()})
 	}
 	return opts
@@ -204,21 +230,28 @@ func splitTable(d ExpenseFormData) Node {
 	f := d.Form
 	cur, _ := money.LookupCurrency(f.Currency)
 
-	usesIncluded := f.SplitType == split.Equal || f.SplitType == split.Adjustment
-	usesValues := f.SplitType != split.Equal
+	// With two people the second value follows from the first (see app.js).
+	var pair string
+	if len(d.Participants) == 2 && (f.SplitType == split.Percentage || f.SplitType == split.Exact) {
+		pair = string(f.SplitType)
+	}
 
 	var unit, placeholder, hint string
 	switch f.SplitType {
-	case split.Equal:
-		hint = "Select who shares this expense."
 	case split.Percentage:
 		unit, placeholder, hint = "%", "0", "Percentages must add up to 100%."
 	case split.Shares:
 		unit, placeholder, hint = "shares", "0", "Each person pays in proportion to their shares."
 	case split.Exact:
 		unit, placeholder, hint = cur.Code, "0.00", "Amounts must add up to the total."
-	case split.Adjustment:
-		unit, placeholder, hint = cur.Code, "+0.00", "Add or subtract from a person's equal share."
+	}
+
+	names := make([]string, len(d.Participants))
+	for i, p := range d.Participants {
+		names[i] = p.DisplayName()
+		if p.ID == d.Me.ID {
+			names[i] = "You"
+		}
 	}
 
 	previewOn := func(trigger string) Node {
@@ -233,38 +266,47 @@ func splitTable(d ExpenseFormData) Node {
 	return Div(Class("stack-sm"),
 		P(Class("hint"), Text(hint)),
 		Table(Class("split-table"),
+			If(pair != "", Data("pair", pair)),
+			If(pair == string(split.Exact), Data("decimals", strconv.Itoa(int(cur.Decimals)))),
 			TBody(
 				Map(d.Participants, func(p *domain.User) Node {
-					name := p.DisplayName()
-					if p.ID == d.Me.ID {
-						name = "You"
-					}
+					name := names[slices.Index(d.Participants, p)]
 					key := contract.ValueKey(p.ID)
 
 					return Tr(
-						Td(
-							If(usesIncluded,
-								Label(Class("check"),
-									Input(Type("checkbox"), Name("included"), Value(p.ID.String()),
-										If(f.Included[p.ID], Checked()), previewOn("change")),
-									Span(Text(name)),
-								),
-							),
-							If(!usesIncluded, Span(Text(name))),
-						),
-						If(usesValues, Td(Class("share"),
+						Td(Span(Text(name))),
+						Td(Class("share"),
 							Input(Type("text"), Name(key), Value(f.Values[p.ID]), Placeholder(placeholder),
+								If(pair != "", Data("split-value", "")),
 								Attr("inputmode", "decimal"), AutoComplete("off"),
 								Aria("label", name+" "+unit),
 								If(d.Errors.Get(key) != "", Class("invalid")),
 								previewOn("input changed delay:300ms"),
 							),
 							components.ErrorText(d.Errors.Get(key)),
-						)),
-						If(usesValues, Td(Class("muted small nowrap"), Text(unit))),
+						),
+						Td(Class("muted small nowrap"), Text(unit)),
 					)
 				}),
 			),
+		),
+		If(pair == string(split.Percentage), percentSlider(names, f.Values[d.Participants[0].ID])),
+	)
+}
+
+// percentSlider renders a slider for the first person's percentage of a
+// two-person split. It isn't submitted: app.js copies it into the inputs.
+func percentSlider(names []string, first string) Node {
+	value := "50"
+	if d, err := money.ParseDecimal(first); err == nil && d.LessThanOrEqual(decimal.NewFromInt(100)) {
+		value = d.Round(0).String()
+	}
+	return Div(Class("split-slider stack-sm"),
+		Input(Type("range"), Min("0"), Max("100"), Step("1"), Value(value), Data("split-slider", ""),
+			Aria("label", names[0]+" percentage")),
+		Div(Class("row-between muted small"),
+			Span(Text(names[0])),
+			Span(Text(names[1])),
 		),
 	)
 }

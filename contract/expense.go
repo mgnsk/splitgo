@@ -38,11 +38,10 @@ type ExpenseForm struct {
 	Mode        string
 	Preset      split.Preset
 	PaidBy      snowflake.ID
-	SplitType   split.Type
-	// Included are the participants of equal and adjustment splits.
-	Included map[snowflake.ID]bool
+	// SplitType is the advanced mode split type, one of split.AdvancedTypes.
+	SplitType split.Type
 	// Values are per-person inputs keyed by user ID: percentages, shares,
-	// exact amounts or adjustments depending on SplitType.
+	// or exact amounts depending on SplitType.
 	Values map[snowflake.ID]string
 }
 
@@ -56,7 +55,6 @@ func ParseExpenseForm(form url.Values) *ExpenseForm {
 		Mode:        form.Get("mode"),
 		Preset:      split.Preset(form.Get("preset")),
 		SplitType:   split.Type(form.Get("split_type")),
-		Included:    map[snowflake.ID]bool{},
 		Values:      map[snowflake.ID]string{},
 	}
 
@@ -64,18 +62,12 @@ func ParseExpenseForm(form url.Values) *ExpenseForm {
 		f.Mode = ModeSimple
 	}
 
-	if !f.SplitType.Valid() {
-		f.SplitType = split.Equal
+	if !slices.Contains(split.AdvancedTypes, f.SplitType) {
+		f.SplitType = split.Percentage
 	}
 
 	if id, ok := parseID(form.Get("paid_by")); ok {
 		f.PaidBy = id
-	}
-
-	for _, s := range form["included"] {
-		if id, ok := parseID(s); ok {
-			f.Included[id] = true
-		}
 	}
 
 	for key, vals := range form {
@@ -90,19 +82,15 @@ func ParseExpenseForm(form url.Values) *ExpenseForm {
 }
 
 // NewExpenseForm returns a form with defaults for a new expense.
-func NewExpenseForm(group *domain.Group, me snowflake.ID, people []*domain.User, today time.Time) *ExpenseForm {
+func NewExpenseForm(group *domain.Group, me snowflake.ID, today time.Time) *ExpenseForm {
 	f := &ExpenseForm{
 		Currency:  group.Currency,
 		Date:      today.Format(domain.DateLayout),
 		Mode:      ModeSimple,
 		Preset:    split.YouPaidEqual,
 		PaidBy:    me,
-		SplitType: split.Equal,
-		Included:  map[snowflake.ID]bool{},
+		SplitType: split.Percentage,
 		Values:    map[snowflake.ID]string{},
-	}
-	for _, p := range people {
-		f.Included[p.ID] = true
 	}
 	return f
 }
@@ -120,13 +108,19 @@ func ExpenseFormFromExpense(e *domain.Expense, me snowflake.ID, people []*domain
 		Mode:        ModeAdvanced,
 		PaidBy:      e.PaidBy,
 		SplitType:   e.SplitType,
-		Included:    map[snowflake.ID]bool{},
 		Values:      map[snowflake.ID]string{},
 	}
 
 	for _, p := range e.Participants {
-		f.Included[p.UserID] = true
 		f.Values[p.UserID] = p.SplitValue
+		// Equal splits that simple mode can't express open as one share each.
+		if e.SplitType == split.Equal {
+			f.Values[p.UserID] = "1"
+		}
+		// Expenses migrated from removed split types keep only their shares.
+		if e.SplitType == split.Exact && p.SplitValue == "" {
+			f.Values[p.UserID] = money.FormatPlain(p.Share, cur)
+		}
 	}
 
 	ids := personIDs(people)
@@ -145,6 +139,10 @@ func ExpenseFormFromExpense(e *domain.Expense, me snowflake.ID, people []*domain
 
 	if f.Preset == "" {
 		f.Preset = split.YouPaidEqual
+	}
+
+	if f.SplitType == split.Equal {
+		f.SplitType = split.Shares
 	}
 
 	return f
@@ -276,29 +274,22 @@ func (f *ExpenseForm) ResolveSplit(me snowflake.ID, people []*domain.User, amoun
 	default:
 		payer = f.PaidBy
 		typ = f.SplitType
+		participants = ids
 
-		switch typ {
-		case split.Equal, split.Adjustment:
-			for _, id := range ids {
-				if f.Included[id] {
-					participants = append(participants, id)
-				}
-			}
-		default:
-			participants = ids
+		if !slices.Contains(split.AdvancedTypes, typ) {
+			errs.Set("split", "Choose how to split")
+			return nil, errs
 		}
 
-		if typ != split.Equal {
-			values = make([]decimal.Decimal, len(participants))
-			splitValues = make([]string, len(participants))
-			for i, id := range participants {
-				v, s, err := parseSplitValue(typ, f.Values[id], cur)
-				if err != nil {
-					errs.Set(valueKey(id), Capitalize(err.Error()))
-					continue
-				}
-				values[i], splitValues[i] = v, s
+		values = make([]decimal.Decimal, len(participants))
+		splitValues = make([]string, len(participants))
+		for i, id := range participants {
+			v, s, err := parseSplitValue(typ, f.Values[id], cur)
+			if err != nil {
+				errs.Set(valueKey(id), Capitalize(err.Error()))
+				continue
 			}
+			values[i], splitValues[i] = v, s
 		}
 	}
 
@@ -394,26 +385,6 @@ func parseSplitValue(typ split.Type, s string, cur money.Currency) (decimal.Deci
 			return decimal.Zero, "", err
 		}
 		return decimal.NewFromInt(minor), money.FormatPlain(minor, cur), nil
-
-	case split.Adjustment:
-		neg := false
-		if rest, ok := strings.CutPrefix(s, "-"); ok {
-			neg, s = true, rest
-		} else {
-			s = strings.TrimPrefix(s, "+")
-		}
-		d, err := money.ParseDecimal(s)
-		if err != nil {
-			return decimal.Zero, "", err
-		}
-		minor, err := money.ToMinor(d, cur)
-		if err != nil {
-			return decimal.Zero, "", err
-		}
-		if neg {
-			minor = -minor
-		}
-		return decimal.NewFromInt(minor), money.FormatPlain(minor, cur), nil
 	}
 
 	return decimal.Zero, "", nil
@@ -469,28 +440,34 @@ func otherPerson(me snowflake.ID, people []*domain.User) (snowflake.ID, bool) {
 }
 
 // SwitchToAdvanced switches the form to advanced mode, carrying over the
-// payer and participants chosen in simple mode.
+// payer and split chosen in simple mode: a two-person preset as percentages,
+// an equal split among everyone as one share each.
 func (f *ExpenseForm) SwitchToAdvanced(me snowflake.ID, people []*domain.User) {
 	if f.Mode == ModeAdvanced {
 		return
 	}
 
 	f.Mode = ModeAdvanced
-	f.SplitType = split.Equal
-	f.Included = map[snowflake.ID]bool{}
+	f.Values = map[snowflake.ID]string{}
 
 	if len(people) == 2 {
 		other, _ := otherPerson(me, people)
 		if plan, ok := split.Resolve(f.Preset, me, other); ok {
 			f.PaidBy = plan.Payer
+			f.SplitType = split.Percentage
+			pct := strconv.Itoa(100 / len(plan.Participants))
+			for _, p := range people {
+				f.Values[p.ID] = "0"
+			}
 			for _, id := range plan.Participants {
-				f.Included[id] = true
+				f.Values[id] = pct
 			}
 			return
 		}
 	}
 
+	f.SplitType = split.Shares
 	for _, p := range people {
-		f.Included[p.ID] = true
+		f.Values[p.ID] = "1"
 	}
 }

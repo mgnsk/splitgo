@@ -112,12 +112,12 @@ var _ = Describe("expenses", func() {
 		It("simplifies debts when enabled", func() {
 			// carol owes bob 10 and bob owes alice 10 => carol pays alice.
 			alice.addExpense(group, url.Values{
-				"amount": {"10"}, "mode": {"advanced"}, "split_type": {"equal"},
-				"paid_by": {bobU.ID.String()}, "included": {carol.ID.String()},
+				"amount": {"10"}, "mode": {"advanced"}, "split_type": {"shares"},
+				"paid_by": {bobU.ID.String()}, "value_" + carol.ID.String(): {"1"},
 			})
 			alice.addExpense(group, url.Values{
-				"amount": {"10"}, "mode": {"advanced"}, "split_type": {"equal"},
-				"paid_by": {aliceU.ID.String()}, "included": {bobU.ID.String()},
+				"amount": {"10"}, "mode": {"advanced"}, "split_type": {"shares"},
+				"paid_by": {aliceU.ID.String()}, "value_" + bobU.ID.String(): {"1"},
 			})
 			b := balances(alice)
 			Expect(b).To(ContainSubstring("carol owes bob €10.00"))
@@ -136,8 +136,21 @@ var _ = Describe("expenses", func() {
 				"amount": {"30"}, "currency": {"EUR"}, "mode": {"simple"}, "preset": {"they-owed-full"}, "switch": {"advanced"},
 			}, true)
 			Expect(resp.body).To(MatchRegexp(fmt.Sprintf(`<option value="%s" selected>bob</option>`, bobU.ID)))
-			Expect(resp.body).To(MatchRegexp(fmt.Sprintf(`name="included" value="%s" checked`, aliceU.ID)))
-			Expect(resp.body).NotTo(MatchRegexp(fmt.Sprintf(`name="included" value="%s" checked`, bobU.ID)))
+			Expect(resp.body).To(ContainSubstring(fmt.Sprintf(`name="value_%s" value="100"`, aliceU.ID)))
+			Expect(resp.body).To(ContainSubstring(fmt.Sprintf(`name="value_%s" value="0"`, bobU.ID)))
+			Expect(resp.body).NotTo(ContainSubstring(`value="equal"`))
+		})
+
+		It("starts a two-person percentage split at 50/50 with a slider", func() {
+			resp := alice.post(group+"/expenses/split?part=section", url.Values{
+				"amount": {"30"}, "currency": {"EUR"}, "mode": {"advanced"}, "split_type": {"percentage"},
+				"paid_by": {aliceU.ID.String()},
+			}, true)
+			Expect(resp.body).To(ContainSubstring(`data-pair="percentage"`))
+			Expect(resp.body).To(ContainSubstring(fmt.Sprintf(`name="value_%s" value="50"`, bobU.ID)))
+			Expect(resp.body).To(MatchRegexp(`type="range"[^>]*value="50"`))
+			Expect(resp.body).To(ContainSubstring("€15.00"))
+			Expect(resp.body).NotTo(ContainSubstring(`value="adjustment"`))
 		})
 
 		It("saves a percentage split", func() {
@@ -192,7 +205,7 @@ var _ = Describe("expenses", func() {
 	It("rejects a payer outside the group", func() {
 		resp := alice.post(group+"/expenses", url.Values{
 			"description": {"x"}, "amount": {"10"}, "currency": {"EUR"}, "date": {"2026-11-03"},
-			"mode": {"advanced"}, "split_type": {"equal"}, "paid_by": {"12345"}, "included": {aliceU.ID.String()},
+			"mode": {"advanced"}, "split_type": {"shares"}, "paid_by": {"12345"}, "value_" + aliceU.ID.String(): {"1"},
 		}, false)
 		Expect(text(resp.body)).To(ContainSubstring("Choose who paid"))
 	})
@@ -279,8 +292,8 @@ var _ = Describe("expenses", func() {
 	It("lists activity across groups", func() {
 		alice.addExpense(group, url.Values{"description": {"Groceries"}, "amount": {"10"}, "preset": {"you-paid-equal"}})
 		other := alice.createGroup("Trip")
-		alice.addExpense(other, url.Values{"description": {"Solo"}, "amount": {"5"}, "mode": {"advanced"}, "split_type": {"equal"},
-			"paid_by": {aliceU.ID.String()}, "included": {aliceU.ID.String()}})
+		alice.addExpense(other, url.Values{"description": {"Solo"}, "amount": {"5"}, "mode": {"advanced"}, "split_type": {"shares"},
+			"paid_by": {aliceU.ID.String()}, "value_" + aliceU.ID.String(): {"1"}})
 
 		t := text(alice.get("/activity").body)
 		Expect(t).To(ContainSubstring("Groceries Flat · You paid €10.00 you lent €5.00"))
