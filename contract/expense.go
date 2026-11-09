@@ -117,10 +117,6 @@ func ExpenseFormFromExpense(e *domain.Expense, me snowflake.ID, people []*domain
 		if e.SplitType == split.Equal {
 			f.Values[p.UserID] = "1"
 		}
-		// Expenses migrated from removed split types keep only their shares.
-		if e.SplitType == split.Exact && p.SplitValue == "" {
-			f.Values[p.UserID] = money.FormatPlain(p.Share, cur)
-		}
 	}
 
 	ids := personIDs(people)

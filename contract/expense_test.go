@@ -249,22 +249,6 @@ var _ = Describe("ExpenseForm", func() {
 			r := validate(alice, trio, formValues(f))
 			Expect(r.Shares()).To(Equal(map[snowflake.ID]int64{bob.ID: 1500, carol.ID: 1500}))
 		})
-
-		It("prefills exact amounts from shares when inputs are missing", func() {
-			e := &domain.Expense{
-				Description: "Legacy", Amount: 3000, Currency: "EUR", SplitType: split.Exact, PaidBy: alice.ID,
-				Participants: []domain.Participant{
-					{UserID: alice.ID, Share: 1417},
-					{UserID: bob.ID, Share: 667},
-					{UserID: carol.ID, Share: 916},
-				},
-			}
-			f := contract.ExpenseFormFromExpense(e, alice.ID, trio)
-			Expect(f.Mode).To(Equal(contract.ModeAdvanced))
-			Expect(f.Values).To(HaveKeyWithValue(alice.ID, "14.17"))
-			Expect(f.Values).To(HaveKeyWithValue(bob.ID, "6.67"))
-			Expect(f.Values).To(HaveKeyWithValue(carol.ID, "9.16"))
-		})
 	})
 
 	Describe("switching to advanced mode", func() {
