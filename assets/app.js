@@ -405,3 +405,98 @@ document.addEventListener("keydown", (event) => {
     comboClose(input);
   }
 });
+
+// Two-person splits: entering one person's percentage or exact amount fills
+// in the other's with the rest, and the percentage slider sets both. The
+// filled-in values are sent with the preview request the typed input triggers.
+function parseNumber(s) {
+  let v = s.replace(/[\s'_  ]/g, "");
+  const dot = v.lastIndexOf(".");
+  const comma = v.lastIndexOf(",");
+  if (dot >= 0 && comma >= 0) {
+    v = dot > comma ? v.replaceAll(",", "") : v.replaceAll(".", "").replace(",", ".");
+  } else if (comma >= 0) {
+    v = v.replace(",", ".");
+  }
+  return /^\d+(\.\d+)?$|^\.\d+$/.test(v) ? Number(v) : NaN;
+}
+
+function pairParts(table) {
+  const inputs = [...table.querySelectorAll("input[data-split-value]")];
+  if (inputs.length !== 2) {
+    return null;
+  }
+  const slider = table.parentElement.querySelector("input[data-split-slider]");
+  return { inputs, slider };
+}
+
+// Fills the input other than source from its value. Returns whether it did.
+function pairFill(table, source) {
+  const parts = pairParts(table);
+  if (!parts) {
+    return false;
+  }
+  const v = parseNumber(source.value);
+  if (Number.isNaN(v)) {
+    return false;
+  }
+  const other = parts.inputs[0] === source ? parts.inputs[1] : parts.inputs[0];
+
+  if (table.dataset.pair === "percentage") {
+    if (v > 100) {
+      return false;
+    }
+    other.value = String(Math.round((100 - v) * 1e6) / 1e6);
+    if (parts.slider) {
+      const first = source === parts.inputs[0] ? v : 100 - v;
+      parts.slider.value = String(Math.round(first));
+    }
+    return true;
+  }
+
+  // Exact amounts, computed in minor units.
+  const amount = document.querySelector('input[name="amount"]');
+  const total = amount ? parseNumber(amount.value) : NaN;
+  if (Number.isNaN(total) || v > total) {
+    return false;
+  }
+  const decimals = Number(table.dataset.decimals || "2");
+  const scale = 10 ** decimals;
+  const rest = Math.round(total * scale) - Math.round(v * scale);
+  other.value = (rest / scale).toFixed(decimals);
+  return true;
+}
+
+document.addEventListener("input", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) {
+    return;
+  }
+
+  if (target.matches("table[data-pair] input[data-split-value]")) {
+    pairFill(target.closest("table"), target);
+    return;
+  }
+
+  if (target.matches("input[data-split-slider]")) {
+    const table = target.closest("#split-section")?.querySelector("table[data-pair]");
+    const parts = table && pairParts(table);
+    if (parts) {
+      parts.inputs[0].value = target.value;
+      parts.inputs[1].value = String(100 - Number(target.value));
+      // Let htmx refresh the preview.
+      parts.inputs[0].dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    return;
+  }
+
+  // A new total changes the rest of an exact two-person split.
+  if (target.name === "amount") {
+    const table = document.querySelector('table[data-pair="exact"]');
+    const parts = table && pairParts(table);
+    // The amount field's own preview request carries the new values.
+    if (parts && parts.inputs[0].value.trim() !== "") {
+      pairFill(table, parts.inputs[0]);
+    }
+  }
+});

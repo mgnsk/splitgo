@@ -176,10 +176,10 @@ var _ = Describe("groups", func() {
 		Expect(resp.StatusCode).To(Equal(http.StatusSeeOther))
 
 		// Bob owes Alice 10, Carol owes Bob 10; Carol pays Alice and Bob leaves.
-		alice.addExpense(group, url.Values{"amount": {"10"}, "mode": {"advanced"}, "split_type": {"equal"},
-			"paid_by": {aliceU.ID.String()}, "included": {bobU.ID.String()}})
-		alice.addExpense(group, url.Values{"amount": {"10"}, "mode": {"advanced"}, "split_type": {"equal"},
-			"paid_by": {bobU.ID.String()}, "included": {carol.ID.String()}})
+		alice.addExpense(group, url.Values{"amount": {"10"}, "mode": {"advanced"}, "split_type": {"shares"},
+			"paid_by": {aliceU.ID.String()}, "value_" + bobU.ID.String(): {"1"}})
+		alice.addExpense(group, url.Values{"amount": {"10"}, "mode": {"advanced"}, "split_type": {"shares"},
+			"paid_by": {bobU.ID.String()}, "value_" + carol.ID.String(): {"1"}})
 		Expect(alice.post(group+"/settle", url.Values{
 			"from": {carol.ID.String()}, "to": {aliceU.ID.String()},
 			"amount": {"10"}, "currency": {"EUR"}, "date": {"2026-11-03"},
@@ -224,10 +224,10 @@ var _ = Describe("groups", func() {
 		Expect(resp.StatusCode).To(Equal(http.StatusSeeOther))
 
 		// Bob owes Alice 10 and Carol owes Bob 10: simplified, Carol pays Alice.
-		alice.addExpense(group, url.Values{"amount": {"10"}, "mode": {"advanced"}, "split_type": {"equal"},
-			"paid_by": {aliceU.ID.String()}, "included": {bobU.ID.String()}})
-		alice.addExpense(group, url.Values{"amount": {"10"}, "mode": {"advanced"}, "split_type": {"equal"},
-			"paid_by": {bobU.ID.String()}, "included": {carol.ID.String()}})
+		alice.addExpense(group, url.Values{"amount": {"10"}, "mode": {"advanced"}, "split_type": {"shares"},
+			"paid_by": {aliceU.ID.String()}, "value_" + bobU.ID.String(): {"1"}})
+		alice.addExpense(group, url.Values{"amount": {"10"}, "mode": {"advanced"}, "split_type": {"shares"},
+			"paid_by": {bobU.ID.String()}, "value_" + carol.ID.String(): {"1"}})
 		Expect(text(alice.get(group).body)).To(ContainSubstring("carol owes you €10.00"))
 
 		resp = alice.post(group+"/settle", url.Values{

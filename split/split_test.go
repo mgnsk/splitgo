@@ -74,13 +74,6 @@ var _ = Describe("Compute", func() {
 		Entry("exact with zero", int64(1000), split.Exact, ds("1000", "0"), []int64{1000, 0}),
 		Entry("exact trailing zero decimals", int64(1000), split.Exact, ds("250.00", "750"), []int64{250, 750}),
 
-		// Adjustment.
-		Entry("adjustment none equals equal", int64(100), split.Adjustment, ds("0", "0", "0"), []int64{34, 33, 33}),
-		Entry("adjustment one extra", int64(1000), split.Adjustment, ds("100", "0"), []int64{550, 450}),
-		Entry("adjustment split-pro example", int64(15000), split.Adjustment, ds("0", "500", "0"), []int64{4834, 5333, 4833}),
-		Entry("adjustment negative within bounds", int64(1000), split.Adjustment, ds("-100", "0"), []int64{450, 550}),
-		Entry("adjustment negative offsets", int64(1000), split.Adjustment, ds("-600", "0"), []int64{200, 800}),
-		Entry("adjustment equals total", int64(1000), split.Adjustment, ds("1000", "0"), []int64{1000, 0}),
 	)
 
 	DescribeTable("invalid splits",
@@ -102,11 +95,6 @@ var _ = Describe("Compute", func() {
 		Entry("exact single over total", int64(1000), split.Exact, ds("1001", "0"), split.ErrExactSum),
 		Entry("exact fractional minor unit", int64(1000), split.Exact, ds("250.5", "749.5"), split.ErrNotWholeUnits),
 		Entry("exact negative", int64(1000), split.Exact, ds("-250", "1250"), split.ErrNegativeValue),
-		Entry("adjustment exceeds total", int64(1000), split.Adjustment, ds("600", "500"), split.ErrAdjustmentExceed),
-		Entry("adjustment single exceeds total", int64(1000), split.Adjustment, ds("1001", "0"), split.ErrAdjustmentExceed),
-		Entry("adjustment negative share", int64(1000), split.Adjustment, ds("-600", "0", "0"), split.ErrNegativeShare),
-		Entry("adjustment large negative", int64(1000), split.Adjustment, ds("-1001", "0"), split.ErrAdjustmentExceed),
-		Entry("adjustment fractional", int64(1000), split.Adjustment, ds("0.5", "0"), split.ErrNotWholeUnits),
 	)
 
 	It("reports the actual sum in SumError", func() {

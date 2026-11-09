@@ -14,7 +14,7 @@ with SQLite, [htmx](https://htmx.org) and [gomponents](https://www.gomponents.co
   - they paid, split equally
   - they are owed the full amount
 
-  **More options** splits equally, by percentage, by shares, by exact amounts or by adjustments.
+  **More options** splits by percentage, by shares or by exact amounts. With two people, entering one percentage or amount fills in the other, and a slider sets the percentages.
 - Per-person and per-group balances, kept separately for each currency
 - Settle up, including partial payments
 - Optional debt simplification per group

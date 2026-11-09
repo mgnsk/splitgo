@@ -29,13 +29,14 @@ const (
 	Shares Type = "shares"
 	// Exact assigns exact amounts in minor units. Values must sum to the total.
 	Exact Type = "exact"
-	// Adjustment splits equally after adding per-participant adjustments
-	// in minor units: share_i = (total - Σadj)/n + adj_i.
-	Adjustment Type = "adjustment"
 )
 
 // Types lists all split types in display order.
-var Types = []Type{Equal, Percentage, Shares, Exact, Adjustment}
+var Types = []Type{Equal, Percentage, Shares, Exact}
+
+// AdvancedTypes lists the split types offered in advanced mode. Equal splits
+// are made with the simple mode presets.
+var AdvancedTypes = []Type{Percentage, Shares, Exact}
 
 // Valid reports whether t is a known split type.
 func (t Type) Valid() bool {
@@ -53,8 +54,6 @@ func (t Type) Label() string {
 		return "By shares"
 	case Exact:
 		return "Exact amounts"
-	case Adjustment:
-		return "Adjustment"
 	default:
 		return string(t)
 	}
@@ -70,8 +69,6 @@ var (
 	ErrSharesZero       = errors.New("total shares must be greater than zero")
 	ErrNotWholeUnits    = errors.New("amounts must be whole minor units")
 	ErrExactSum         = errors.New("amounts must add up to the total")
-	ErrAdjustmentExceed = errors.New("adjustments exceed the total")
-	ErrNegativeShare    = errors.New("adjustments result in a negative share")
 )
 
 // SumError is returned when values do not add up as required.
@@ -106,7 +103,7 @@ func Compute(total int64, t Type, values []decimal.Decimal) ([]int64, error) {
 		return nil, ErrNoParticipants
 	}
 
-	if t != Equal && t != Adjustment {
+	if t != Equal {
 		for _, v := range values {
 			if v.IsNegative() {
 				return nil, ErrNegativeValue
@@ -145,31 +142,6 @@ func Compute(total int64, t Type, values []decimal.Decimal) ([]int64, error) {
 		}
 		if sum != total {
 			return nil, &SumError{Err: ErrExactSum, Want: decimal.NewFromInt(total), Got: decimal.NewFromInt(sum)}
-		}
-		return result, nil
-
-	case Adjustment:
-		totalDec := decimal.NewFromInt(total)
-		adjSum := decimal.Zero
-		for _, v := range values {
-			if !v.IsInteger() {
-				return nil, ErrNotWholeUnits
-			}
-			if v.Abs().GreaterThan(totalDec) {
-				return nil, ErrAdjustmentExceed
-			}
-			adjSum = adjSum.Add(v)
-		}
-		rest := totalDec.Sub(adjSum)
-		if rest.IsNegative() {
-			return nil, ErrAdjustmentExceed
-		}
-		result := apportion(rest.IntPart(), ones(len(values)))
-		for i, v := range values {
-			result[i] += v.IntPart()
-			if result[i] < 0 {
-				return nil, ErrNegativeShare
-			}
 		}
 		return result, nil
 	}

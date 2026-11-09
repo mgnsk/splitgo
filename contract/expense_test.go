@@ -109,14 +109,9 @@ var _ = Describe("ExpenseForm", func() {
 			return form
 		}
 
-		It("splits equally among included people", func() {
-			r := validate(alice, trio, advanced(split.Equal, url.Values{"included": {id(bob), id(carol)}}))
-			Expect(r.Shares()).To(Equal(map[snowflake.ID]int64{bob.ID: 1500, carol.ID: 1500}))
-		})
-
-		It("requires at least one included person", func() {
-			errs := validateErrs(alice, trio, advanced(split.Equal, nil))
-			Expect(errs.Get("split")).To(Equal("Select at least one person"))
+		It("doesn't offer equal splits", func() {
+			f := contract.ParseExpenseForm(advanced(split.Equal, nil))
+			Expect(f.SplitType).To(Equal(split.Percentage))
 		})
 
 		It("splits by percentage and stores the inputs", func() {
@@ -163,31 +158,6 @@ var _ = Describe("ExpenseForm", func() {
 		It("rejects too precise exact amounts per field", func() {
 			errs := validateErrs(alice, trio, advanced(split.Exact, url.Values{"value_101": {"10.001"}}))
 			Expect(errs.Get("value_101")).To(Equal("Too many decimal places"))
-		})
-
-		It("splits with signed adjustments among included people", func() {
-			r := validate(alice, trio, advanced(split.Adjustment, url.Values{
-				"included":  {id(alice), id(bob), id(carol)},
-				"value_101": {"+5"}, "value_102": {"-2.50"},
-			}))
-			// (30 - 2.50) / 3 = 9.1666.. => 9.17, 9.17, 9.16
-			Expect(r.Participants).To(Equal([]domain.Participant{
-				{UserID: alice.ID, Share: 1417, SplitValue: "5.00"},
-				{UserID: bob.ID, Share: 667, SplitValue: "-2.50"},
-				{UserID: carol.ID, Share: 916},
-			}))
-			var sum int64
-			for _, p := range r.Participants {
-				sum += p.Share
-			}
-			Expect(sum).To(Equal(int64(3000)))
-		})
-
-		It("rejects adjustments exceeding the total", func() {
-			errs := validateErrs(alice, trio, advanced(split.Adjustment, url.Values{
-				"included": {id(alice), id(bob)}, "value_101": {"20"}, "value_102": {"20"},
-			}))
-			Expect(errs.Get("split")).To(Equal("Adjustments exceed the total"))
 		})
 	})
 
@@ -265,6 +235,20 @@ var _ = Describe("ExpenseForm", func() {
 			r := validate(alice, trio, formValues(f))
 			Expect(r.Participants).To(Equal(e.Participants))
 		})
+
+		It("reopens equal splits among some people as one share each", func() {
+			e := &domain.Expense{
+				Description: "Lunch", Amount: 3000, Currency: "EUR", SplitType: split.Equal, PaidBy: alice.ID,
+				Participants: []domain.Participant{{UserID: bob.ID, Share: 1500}, {UserID: carol.ID, Share: 1500}},
+			}
+			f := contract.ExpenseFormFromExpense(e, alice.ID, trio)
+			Expect(f.Mode).To(Equal(contract.ModeAdvanced))
+			Expect(f.SplitType).To(Equal(split.Shares))
+			Expect(f.Values).To(Equal(map[snowflake.ID]string{bob.ID: "1", carol.ID: "1"}))
+
+			r := validate(alice, trio, formValues(f))
+			Expect(r.Shares()).To(Equal(map[snowflake.ID]int64{bob.ID: 1500, carol.ID: 1500}))
+		})
 	})
 
 	Describe("switching to advanced mode", func() {
@@ -273,20 +257,31 @@ var _ = Describe("ExpenseForm", func() {
 			f.SwitchToAdvanced(alice.ID, pair)
 			Expect(f.Mode).To(Equal(contract.ModeAdvanced))
 			Expect(f.PaidBy).To(Equal(bob.ID))
-			Expect(f.Included).To(Equal(map[snowflake.ID]bool{alice.ID: true}))
+			Expect(f.SplitType).To(Equal(split.Percentage))
+			Expect(f.Values).To(Equal(map[snowflake.ID]string{alice.ID: "100", bob.ID: "0"}))
+
+			r := validate(alice, pair, formValues(f))
+			Expect(r.Shares()).To(Equal(map[snowflake.ID]int64{alice.ID: 3000}))
 		})
 
-		It("includes everyone for larger groups", func() {
+		It("carries over an equal preset as 50/50", func() {
+			f := contract.ParseExpenseForm(baseForm(url.Values{"preset": {"you-paid-equal"}}))
+			f.SwitchToAdvanced(alice.ID, pair)
+			Expect(f.Values).To(Equal(map[snowflake.ID]string{alice.ID: "50", bob.ID: "50"}))
+		})
+
+		It("gives everyone one share in larger groups", func() {
 			f := contract.ParseExpenseForm(baseForm(url.Values{"paid_by": {id(carol)}}))
 			f.SwitchToAdvanced(alice.ID, trio)
 			Expect(f.PaidBy).To(Equal(carol.ID))
-			Expect(f.Included).To(HaveLen(3))
+			Expect(f.SplitType).To(Equal(split.Shares))
+			Expect(f.Values).To(Equal(map[snowflake.ID]string{alice.ID: "1", bob.ID: "1", carol.ID: "1"}))
 		})
 	})
 
 	It("NewExpenseForm defaults to simple mode and today", func() {
 		g := &domain.Group{Currency: "USD"}
-		f := contract.NewExpenseForm(g, alice.ID, pair, time.Date(2026, 11, 3, 15, 0, 0, 0, time.UTC))
+		f := contract.NewExpenseForm(g, alice.ID, time.Date(2026, 11, 3, 15, 0, 0, 0, time.UTC))
 		Expect(f.Mode).To(Equal(contract.ModeSimple))
 		Expect(f.Preset).To(Equal(split.YouPaidEqual))
 		Expect(f.Currency).To(Equal("USD"))
@@ -305,11 +300,6 @@ func formValues(f *contract.ExpenseForm) url.Values {
 		"preset":      {string(f.Preset)},
 		"paid_by":     {f.PaidBy.String()},
 		"split_type":  {string(f.SplitType)},
-	}
-	for uid, ok := range f.Included {
-		if ok {
-			v.Add("included", uid.String())
-		}
 	}
 	for uid, s := range f.Values {
 		v.Set(contract.ValueKey(uid), s)
