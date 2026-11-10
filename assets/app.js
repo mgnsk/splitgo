@@ -527,3 +527,13 @@ for (const type of ["keydown", "focusout"]) {
     splitFocused = null;
   });
 }
+
+// Changing the split type swaps the split section, and htmx then focuses the
+// new select because it has the same id. Mobile browsers open the picker on
+// focus, so it would pop up again right after choosing. Drop the focus first.
+document.addEventListener("change", (event) => {
+  const target = event.target;
+  if (target instanceof HTMLSelectElement && target.closest("#split-section")) {
+    target.blur();
+  }
+});
