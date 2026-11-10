@@ -500,3 +500,30 @@ document.addEventListener("input", (event) => {
     }
   }
 });
+
+// Split value inputs are right-aligned, so a tap left of the number puts the
+// caret before it. Select the whole value instead so typing replaces it.
+// Mobile browsers place the caret after the focus event, on the tap's click,
+// so select again on the click that came with the focus.
+let splitFocused = null;
+
+document.addEventListener("focusin", (event) => {
+  const target = event.target;
+  if (target instanceof HTMLInputElement && target.matches(".split-table input")) {
+    splitFocused = target;
+    target.select();
+  }
+});
+
+document.addEventListener("click", (event) => {
+  if (event.target === splitFocused) {
+    splitFocused.select();
+  }
+  splitFocused = null;
+});
+
+for (const type of ["keydown", "focusout"]) {
+  document.addEventListener(type, () => {
+    splitFocused = null;
+  });
+}
