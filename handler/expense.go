@@ -87,7 +87,7 @@ func (h *ExpenseHandler) Create(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, d.LedgerURL(), http.StatusSeeOther)
 }
 
-// Split renders the split section or its live preview (htmx).
+// Split renders the split section, its values or its live preview (htmx).
 func (h *ExpenseHandler) Split(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	me := mustUser(r)
@@ -109,12 +109,14 @@ func (h *ExpenseHandler) Split(w http.ResponseWriter, r *http.Request) {
 
 	data := html.ExpenseFormData{GroupData: d, Participants: participants, Form: form}
 
-	if r.URL.Query().Get("part") == "preview" {
+	switch r.URL.Query().Get("part") {
+	case "preview":
 		web.Render(w, html.SplitPreview(data))
-		return
+	case "values":
+		web.Render(w, html.SplitValues(data))
+	default:
+		web.Render(w, html.SplitSection(data))
 	}
-
-	web.Render(w, html.SplitSection(data))
 }
 
 // Show renders an expense.

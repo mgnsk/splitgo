@@ -147,15 +147,14 @@ func SplitSection(d ExpenseFormData) Node {
 					Value:   string(f.SplitType),
 					Options: splitTypeOptions(),
 					Attrs: []Node{
-						hx.Post(d.splitURL("section")),
+						hx.Post(d.splitURL("values")),
 						hx.Trigger("change"),
-						hx.Target("#split-section"),
+						hx.Target("#split-values"),
 						hx.Swap("outerHTML"),
 					},
 				}),
 			),
-			splitTable(d),
-			SplitPreview(d),
+			SplitValues(d),
 		}
 	}
 
@@ -166,6 +165,17 @@ func SplitSection(d ExpenseFormData) Node {
 			If(f.Mode == contract.ModeSimple, switchButton(contract.ModeAdvanced, "More options")),
 			If(f.Mode != contract.ModeSimple, switchButton(contract.ModeSimple, "Back to simple split")),
 		),
+	)
+}
+
+// SplitValues renders the advanced split's value inputs and preview, the
+// part that changes with the split type. The selects stay in place so that
+// htmx doesn't refocus a swapped select, which reopens its picker on mobile.
+func SplitValues(d ExpenseFormData) Node {
+	d = withEvenPercentages(d)
+	return Div(ID("split-values"), Class("stack-sm"),
+		splitTable(d),
+		SplitPreview(d),
 	)
 }
 

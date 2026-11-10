@@ -142,7 +142,7 @@ var _ = Describe("expenses", func() {
 		})
 
 		It("starts a two-person percentage split at 50/50 with a slider", func() {
-			resp := alice.post(group+"/expenses/split?part=section", url.Values{
+			resp := alice.post(group+"/expenses/split?part=values", url.Values{
 				"amount": {"30"}, "currency": {"EUR"}, "mode": {"advanced"}, "split_type": {"percentage"},
 				"paid_by": {aliceU.ID.String()},
 			}, true)
@@ -150,7 +150,8 @@ var _ = Describe("expenses", func() {
 			Expect(resp.body).To(ContainSubstring(fmt.Sprintf(`name="value_%s" value="50"`, bobU.ID)))
 			Expect(resp.body).To(MatchRegexp(`type="range"[^>]*value="50"`))
 			Expect(resp.body).To(ContainSubstring("€15.00"))
-			Expect(resp.body).NotTo(ContainSubstring(`value="adjustment"`))
+			// The selects are left in place, only the values are swapped.
+			Expect(resp.body).NotTo(ContainSubstring(`<select`))
 		})
 
 		It("saves a percentage split", func() {
