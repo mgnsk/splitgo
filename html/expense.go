@@ -420,6 +420,15 @@ func presetSentence(res *contract.ResolvedSplit, me, other snowflake.ID, otherNa
 	return fmt.Sprintf("You owe %s %s", otherName, money.Format(shares[me], cur))
 }
 
+// splitLabel describes how an expense is split. An equal split with a single
+// participant is the "owed the full amount" preset, not an equal split.
+func splitLabel(e *domain.Expense) string {
+	if e.SplitType == split.Equal && len(e.Participants) == 1 {
+		return "Full amount"
+	}
+	return e.SplitType.Label()
+}
+
 // ExpenseDetailMain renders an expense.
 func ExpenseDetailMain(d GroupData, e *domain.Expense) Node {
 	base := groupURL(d.Group.ID)
@@ -444,7 +453,7 @@ func ExpenseDetailMain(d GroupData, e *domain.Expense) Node {
 					Div(Class("big-amount"), Text(Fmt(e.Amount, e.Currency))),
 					Div(Class("muted small"), Text(e.Date.Format("Monday, 2 January 2006"))),
 				),
-				If(e.Kind == domain.KindExpense, Span(Class("muted small"), Text(e.SplitType.Label()))),
+				If(e.Kind == domain.KindExpense, Span(Class("muted small"), Text(splitLabel(e)))),
 			),
 			Ul(Class("list"),
 				Li(Div(Class("list-item flush"),

@@ -237,6 +237,17 @@ var _ = Describe("expenses", func() {
 		Expect(alice.get(path).StatusCode).To(Equal(http.StatusNotFound))
 	})
 
+	It("labels the split type on the expense page", func() {
+		alice.addExpense(group, url.Values{"description": {"Pizza"}, "amount": {"20"}, "preset": {"you-paid-equal"}})
+		Expect(text(alice.get(firstExpensePath(alice)).body)).To(ContainSubstring("Equally"))
+
+		alice.addExpense(group, url.Values{"description": {"Taxi"}, "amount": {"20"}, "preset": {"you-owed-full"}})
+		detail := text(alice.get(firstExpensePath(alice)).body)
+		Expect(detail).To(ContainSubstring("Taxi"))
+		Expect(detail).To(ContainSubstring("Full amount"))
+		Expect(detail).NotTo(ContainSubstring("Equally"))
+	})
+
 	It("records partial and full payments", func() {
 		alice.addExpense(group, url.Values{"amount": {"24"}, "preset": {"you-paid-equal"}})
 
