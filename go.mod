@@ -1,6 +1,6 @@
 module github.com/mgnsk/splitgo
 
-go 1.26.0
+go 1.27.0
 
 require (
 	github.com/alexedwards/scs/bunstore v0.0.0-20251002162104-209de6e426de
