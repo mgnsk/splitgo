@@ -30,9 +30,7 @@ jobs:
         run: go vet ./...
 
       - name: Lint
-        uses: docker://morphy/revive-action@sha256:28eca8b53427f9f1b0c8d44236b057be4bf62c9118c98223285c0558192f0257
-        with:
-          config: revive.toml
+        run: go tool revive -config revive.toml -formatter stylish ./...
 
       - name: Test
         run: go test -race ./...
