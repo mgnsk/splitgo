@@ -12,8 +12,8 @@ import (
 
 	"github.com/mgnsk/splitgo/domain"
 	"github.com/mgnsk/splitgo/money"
-	"github.com/mgnsk/webkit/snowflake"
 	"github.com/mgnsk/splitgo/split"
+	"github.com/mgnsk/webkit/snowflake"
 	"github.com/shopspring/decimal"
 )
 

@@ -73,7 +73,6 @@ var _ = Describe("Compute", func() {
 		Entry("exact", int64(1000), split.Exact, ds("250", "750"), []int64{250, 750}),
 		Entry("exact with zero", int64(1000), split.Exact, ds("1000", "0"), []int64{1000, 0}),
 		Entry("exact trailing zero decimals", int64(1000), split.Exact, ds("250.00", "750"), []int64{250, 750}),
-
 	)
 
 	DescribeTable("invalid splits",

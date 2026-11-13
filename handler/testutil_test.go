@@ -106,12 +106,12 @@ func newTestEnv(allowSignup bool) *testEnv {
 	}
 
 	deps := &handler.Deps{
-		DB:     db,
-		SM:     server.NewSessionManager(store, true),
-		Mailer: env.mailer,
+		DB:       db,
+		SM:       server.NewSessionManager(store, true),
+		Mailer:   env.mailer,
 		Push:     env.push,
 		Notifier: env.notifier,
-		Live:   env.live,
+		Live:     env.live,
 		Config: handler.Config{
 			BaseURL:     "https://splitgo.test",
 			AllowSignup: allowSignup,

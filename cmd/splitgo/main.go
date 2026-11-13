@@ -16,7 +16,7 @@ import (
 	"github.com/mgnsk/splitgo/live"
 	"github.com/mgnsk/splitgo/mail"
 	"github.com/mgnsk/splitgo/model"
-		"github.com/mgnsk/splitgo/server"
+	"github.com/mgnsk/splitgo/server"
 	"github.com/mgnsk/webkit"
 	"github.com/mgnsk/webkit/app"
 	"github.com/mgnsk/webkit/push"
@@ -94,12 +94,12 @@ func run() error {
 	broker := live.NewBroker()
 
 	deps := &handler.Deps{
-		DB:     db,
-		SM:     server.NewSessionManager(store, cfg.SecureCookies()),
-		Mailer: mailer,
+		DB:       db,
+		SM:       server.NewSessionManager(store, cfg.SecureCookies()),
+		Mailer:   mailer,
 		Push:     notifier,
 		Notifier: notifier,
-		Live:   broker,
+		Live:     broker,
 		Config: handler.Config{
 			BaseURL:     cfg.BaseURL,
 			AllowSignup: cfg.AllowSignup,

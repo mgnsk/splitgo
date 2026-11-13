@@ -3,8 +3,8 @@ package domain
 import (
 	"time"
 
-	"github.com/mgnsk/webkit/snowflake"
 	"github.com/mgnsk/splitgo/split"
+	"github.com/mgnsk/webkit/snowflake"
 )
 
 // ExpenseKind distinguishes expenses from settlements.

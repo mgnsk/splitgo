@@ -21,9 +21,9 @@ import (
 	"github.com/mgnsk/splitgo/live"
 	"github.com/mgnsk/splitgo/mail"
 	"github.com/mgnsk/splitgo/model"
-	"github.com/mgnsk/webkit/push"
 	"github.com/mgnsk/splitgo/server"
 	"github.com/mgnsk/webkit"
+	"github.com/mgnsk/webkit/push"
 	"github.com/mgnsk/webkit/session"
 	"github.com/mgnsk/webkit/snowflake"
 	"github.com/mgnsk/webkit/web"
@@ -53,8 +53,8 @@ type Deps struct {
 	Push *push.Service[snowflake.ID]
 	// Notifier sends push notifications.
 	Notifier push.Notifier[snowflake.ID]
-	Live   *live.Broker
-	Config Config
+	Live     *live.Broker
+	Config   Config
 }
 
 func (d *Deps) now() time.Time {
