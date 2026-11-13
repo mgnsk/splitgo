@@ -20,6 +20,7 @@ type Config struct {
 	SMTPURL     string
 	MailFrom    string
 	AllowSignup bool
+	Debug       bool
 }
 
 // LoadConfig loads the configuration from environment variables.
@@ -40,6 +41,14 @@ func LoadConfig() (*Config, error) {
 			errs = append(errs, fmt.Errorf("allow_signup: %w", err))
 		}
 		c.AllowSignup = b
+	}
+
+	if v := os.Getenv("DEBUG"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("debug: %w", err))
+		}
+		c.Debug = b
 	}
 
 	if c.DatabaseDir == "" {

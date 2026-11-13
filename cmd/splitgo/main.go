@@ -39,6 +39,10 @@ func run() error {
 		return webkit.Internal.New("error loading configuration", err)
 	}
 
+	if cfg.Debug {
+		slog.SetLogLoggerLevel(slog.LevelDebug)
+	}
+
 	databaseDir, err := filepath.Abs(cfg.DatabaseDir)
 	if err != nil {
 		return webkit.Internal.New("invalid database dir", err)

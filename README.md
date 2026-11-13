@@ -39,6 +39,7 @@ Migrations run automatically on startup. Without `SMTP_URL`, sign-in emails (cod
 | `SMTP_URL`     | —       | `smtp://user:pass@host:587` (STARTTLS) or `smtps://user:pass@host:465`       |
 | `MAIL_FROM`    | —       | Sender address, required when `SMTP_URL` is set                             |
 | `ALLOW_SIGNUP` | `false` | Allow anyone to create an account. If disabled, only the first user and invited people can sign in. |
+| `DEBUG`        | `false` | Log debug messages, e.g. every push notification sent and the push service's response. |
 
 ## Money handling
 
