@@ -178,6 +178,21 @@ document.addEventListener("submit", (event) => {
 let liveTimer = 0;
 let livePending = false;
 
+// A live refresh after a deploy that changed the scripts or styles reloads
+// the whole page instead, so the new content doesn't run on the old ones.
+const liveRefreshHeader = "X-Live-Refresh";
+document.addEventListener("htmx:beforeSwap", (event) => {
+  if (!event.detail.requestConfig?.headers?.[liveRefreshHeader]) {
+    return;
+  }
+  const loaded = document.querySelector('meta[name="app-version"]')?.content;
+  const served = event.detail.xhr.getResponseHeader("X-App-Version");
+  if (loaded && served && served !== loaded) {
+    event.detail.shouldSwap = false;
+    window.location.reload();
+  }
+});
+
 function liveRefresh() {
   if (submitting || pwa.navigating || formDirty) {
     return;
@@ -195,7 +210,12 @@ function liveRefresh() {
     const url = window.location.pathname + window.location.search;
     if (window.htmx) {
       window.htmx
-        .ajax("GET", url, { target: "main", select: "main", swap: "outerHTML" })
+        .ajax("GET", url, {
+          target: "main",
+          select: "main",
+          swap: "outerHTML",
+          headers: { [liveRefreshHeader]: "1" },
+        })
         .catch(() => window.location.reload());
     } else {
       window.location.reload();

@@ -6,6 +6,9 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/mgnsk/splitgo"
+	"github.com/mgnsk/splitgo/handler"
+	"github.com/mgnsk/splitgo/html"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -151,9 +154,25 @@ var _ = Describe("PWA", func() {
 		Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		Expect(resp.Header.Get("Cache-Control")).To(Equal("no-cache"))
 		Expect(resp.Header.Get("Content-Type")).To(HavePrefix("text/javascript"))
-		Expect(resp.body).To(ContainSubstring("/assets/offline.html"))
+		Expect(resp.body).To(ContainSubstring(`"offlinePage":"` + html.OfflinePath + `"`))
+		Expect(resp.body).To(ContainSubstring(`"` + splitgo.Assets.Path("app.css") + `"`))
+	})
 
-		Expect(c.get("/assets/offline.html").StatusCode).To(Equal(http.StatusOK))
+	It("serves the offline page with the checksummed stylesheet", func() {
+		Expect(html.OfflinePath).To(MatchRegexp(`^/offline\?crc=\d+$`))
+
+		resp := c.get(html.OfflinePath)
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		Expect(resp.Header.Get("Content-Type")).To(HavePrefix("text/html"))
+		Expect(resp.Header.Get("Cache-Control")).To(ContainSubstring("immutable"))
+		Expect(resp.body).To(ContainSubstring(`href="` + splitgo.Assets.Path("app.css") + `"`))
+		Expect(resp.body).To(ContainSubstring("You&#39;re offline"))
+	})
+
+	It("tells pages the version of their scripts", func() {
+		resp := c.get("/login")
+		Expect(resp.Header.Get(handler.VersionHeader)).To(Equal(html.Version))
+		Expect(resp.body).To(ContainSubstring(`<meta name="app-version" content="` + html.Version + `">`))
 	})
 
 	It("keeps sessions for a year", func() {

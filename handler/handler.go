@@ -72,6 +72,7 @@ func (d *Deps) userNow(user *domain.User) time.Time {
 // middlewares returns the common middlewares for pages.
 func (d *Deps) middlewares(requireUser bool) []web.Middleware {
 	mws := []web.Middleware{
+		versionHeader,
 		session.Middleware(d.SM),
 		server.NewUserMiddleware(d.DB, d.SM),
 	}
@@ -79,6 +80,18 @@ func (d *Deps) middlewares(requireUser bool) []web.Middleware {
 		mws = append(mws, session.RequireUser(server.UserKey, "/login"))
 	}
 	return mws
+}
+
+// VersionHeader is the response header carrying [html.Version], so that
+// a page fetching new content in place can tell that it runs outdated
+// scripts and reload instead.
+const VersionHeader = "X-App-Version"
+
+func versionHeader(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set(VersionHeader, html.Version)
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (d *Deps) handle(mux *http.ServeMux, pattern string, h http.HandlerFunc, requireUser bool) {
@@ -217,7 +230,8 @@ func New(deps *Deps) http.Handler {
 		},
 	},
 		splitgo.Assets.Register,
-		splitgo.PWA.Register,
+		html.PWA.Register,
+		html.RegisterOffline,
 		NewAuthHandler(deps).Register,
 		NewHomeHandler(deps).Register,
 		NewGroupHandler(deps).Register,
